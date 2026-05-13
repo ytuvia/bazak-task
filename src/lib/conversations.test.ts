@@ -30,10 +30,9 @@ describe('createConversationDb', () => {
 });
 
 describe('listConversationsDb', () => {
-  it('returns conversations ordered by created_at descending', async () => {
-    createConversationDb(db, 'First');
-    await new Promise(r => setTimeout(r, 5));
-    createConversationDb(db, 'Second');
+  it('returns conversations ordered by created_at descending', () => {
+    createConversationDb(db, 'First', '2024-01-01T00:00:00.000Z');
+    createConversationDb(db, 'Second', '2024-01-02T00:00:00.000Z');
     const list = listConversationsDb(db);
     expect(list[0].title).toBe('Second');
     expect(list[1].title).toBe('First');

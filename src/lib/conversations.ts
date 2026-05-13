@@ -3,10 +3,9 @@ import type Database from 'better-sqlite3';
 import { getDb } from './db';
 import type { Conversation } from '@/types';
 
-export function createConversationDb(db: Database.Database, title: string): { id: string; threadId: string } {
+export function createConversationDb(db: Database.Database, title: string, createdAt: string = new Date().toISOString()): { id: string; threadId: string } {
   const id = randomUUID();
   const threadId = randomUUID();
-  const createdAt = new Date().toISOString();
   db.prepare('INSERT INTO conversations (id, thread_id, title, created_at) VALUES (?, ?, ?, ?)').run(id, threadId, title, createdAt);
   return { id, threadId };
 }
