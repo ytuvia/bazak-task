@@ -57,9 +57,9 @@ export async function POST(req: NextRequest) {
           ? new Command({ resume: message })
           : { messages: [new HumanMessage(message)] };
 
-        const graphStream = graph.stream(input, config);
+        const graphStream = await graph.stream(input as any, config);
 
-        for await (const [chunk] of graphStream as AsyncIterable<[any, any]>) {
+        for await (const [chunk] of graphStream as unknown as AsyncIterable<[any, any]>) {
           if (!chunk) continue;
           const type = chunk._getType?.();
 

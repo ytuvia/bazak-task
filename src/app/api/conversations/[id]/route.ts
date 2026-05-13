@@ -39,7 +39,7 @@ export async function GET(
 
   if (!state) return Response.json([]);
 
-  const messages: BaseMessage[] = state.channel_values?.messages ?? [];
+  const messages: BaseMessage[] = (state.channel_values?.messages as BaseMessage[] | undefined) ?? [];
   return Response.json(messages.map(serializeMessage));
 }
 

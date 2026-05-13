@@ -5,7 +5,6 @@ import {
   START,
   messagesStateReducer,
   interrupt,
-  RemoveMessage,
 } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { ChatOpenAI } from '@langchain/openai';
@@ -14,6 +13,7 @@ import {
   HumanMessage,
   AIMessage,
   SystemMessage,
+  RemoveMessage,
 } from '@langchain/core/messages';
 import { ALL_TOOLS, AGENT_TOOLS, PRODUCT_TOOLS } from './tools';
 import { getPreferences } from './store';

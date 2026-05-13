@@ -8,7 +8,7 @@ export function stripHeavyFields(product: Record<string, unknown>): Product {
   for (const [k, v] of Object.entries(product)) {
     if (!HEAVY_FIELDS.has(k)) result[k] = v;
   }
-  return result as Product;
+  return result as unknown as Product;
 }
 
 export async function fetchDummyJSON(path: string): Promise<ToolResult> {
