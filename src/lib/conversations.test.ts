@@ -4,6 +4,7 @@ import {
   createConversationDb,
   listConversationsDb,
   getConversationByIdDb,
+  getConversationByThreadIdDb,
   deleteConversationDb,
   updateConversationTitleDb,
 } from './conversations';
@@ -49,6 +50,15 @@ describe('deleteConversationDb', () => {
     const { id } = createConversationDb(db, 'Gone');
     deleteConversationDb(db, id);
     expect(listConversationsDb(db).find(c => c.id === id)).toBeUndefined();
+  });
+});
+
+describe('getConversationByThreadIdDb', () => {
+  it('finds a conversation by its threadId', () => {
+    const { id, threadId } = createConversationDb(db, 'Thread lookup');
+    const conv = getConversationByThreadIdDb(db, threadId);
+    expect(conv?.id).toBe(id);
+    expect(conv?.threadId).toBe(threadId);
   });
 });
 
