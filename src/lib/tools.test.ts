@@ -60,6 +60,7 @@ describe('getProductTool', () => {
   it('returns error shape for missing product', async () => {
     const result = JSON.parse(await getProductTool.invoke({ id: 9999 }));
     expect(result.products).toEqual([]);
+    expect(result.error).toBeDefined();
   });
 });
 

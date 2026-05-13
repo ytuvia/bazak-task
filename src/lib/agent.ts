@@ -100,7 +100,7 @@ async function summarizeNode(
   state: typeof StateAnnotation.State
 ): Promise<Partial<typeof StateAnnotation.State>> {
   const summaryModel = new ChatOpenAI({
-    model: process.env.SUMMARY_MODEL ?? 'gpt-4o-nano',
+    model: process.env.SUMMARY_MODEL ?? 'gpt-4o-mini',
   });
 
   const conversationText = state.messages
@@ -118,6 +118,7 @@ async function summarizeNode(
   // Keep last 4 messages, remove the rest
   const toRemove = state.messages
     .slice(0, -4)
+    .filter(m => m.id != null)
     .map(m => new RemoveMessage({ id: m.id! }));
 
   return { summary, messages: toRemove };
