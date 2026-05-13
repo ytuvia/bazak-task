@@ -260,6 +260,7 @@ export type StreamChunkType =
   | 'tool_result'
   | 'preference_added'
   | 'interrupt'
+  | 'title_update'
   | 'done'
   | 'error';
 
@@ -271,6 +272,7 @@ export interface StreamChunk {
   key?: string;
   value?: string;
   question?: string;
+  title?: string;
   message?: string;
 }
 
@@ -495,6 +497,7 @@ import {
   listConversationsDb,
   getConversationByIdDb,
   deleteConversationDb,
+  updateConversationTitleDb,
 } from './conversations';
 import type Database from 'better-sqlite3';
 
@@ -540,6 +543,14 @@ describe('deleteConversationDb', () => {
     const { id } = createConversationDb(db, 'Gone');
     deleteConversationDb(db, id);
     expect(listConversationsDb(db).find(c => c.id === id)).toBeUndefined();
+  });
+});
+
+describe('updateConversationTitleDb', () => {
+  it('updates the title', () => {
+    const { id } = createConversationDb(db, 'New conversation');
+    updateConversationTitleDb(db, id, 'Wireless headphones');
+    expect(getConversationByIdDb(db, id)?.title).toBe('Wireless headphones');
   });
 });
 ```
@@ -606,6 +617,10 @@ export function deleteConversationDb(db: Database.Database, id: string): void {
   db.prepare('DELETE FROM conversations WHERE id = ?').run(id);
 }
 
+export function updateConversationTitleDb(db: Database.Database, id: string, title: string): void {
+  db.prepare('UPDATE conversations SET title = ? WHERE id = ?').run(title, id);
+}
+
 export const createConversation = (title: string) =>
   createConversationDb(getDb(), title);
 export const listConversations = () => listConversationsDb(getDb());
@@ -615,6 +630,8 @@ export const getConversationByThreadId = (threadId: string) =>
   getConversationByThreadIdDb(getDb(), threadId);
 export const deleteConversation = (id: string) =>
   deleteConversationDb(getDb(), id);
+export const updateConversationTitle = (id: string, title: string) =>
+  updateConversationTitleDb(getDb(), id, title);
 ```
 
 - [ ] **Step 4: Run to verify it passes**
@@ -1677,6 +1694,36 @@ describe('POST /api/chat', () => {
     const callArg = mockGraph.stream.mock.calls.at(-1)?.[0];
     expect(callArg).toBeInstanceOf(Command);
   });
+
+  it('emits title_update chunk on first message', async () => {
+    vi.mock('openai', () => ({
+      default: vi.fn().mockImplementation(() => ({
+        chat: {
+          completions: {
+            create: vi.fn(async () => ({
+              choices: [{ message: { content: 'Wireless headphones search' } }],
+            })),
+          },
+        },
+      })),
+    }));
+    vi.mock('@/lib/conversations', () => ({
+      getConversationByThreadId: vi.fn(),
+      updateConversationTitle: vi.fn(),
+    }));
+    const res = await POST(new NextRequest('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        threadId: 'thread-1',
+        message: 'show me headphones',
+        convId: 'conv-1',
+        isFirstMessage: true,
+      }),
+    }));
+    const chunks = await collectChunks(res);
+    const titleChunk = chunks.find((c: any) => c.type === 'title_update') as any;
+    expect(titleChunk?.title).toBe('Wireless headphones search');
+  });
 });
 ```
 
@@ -1693,17 +1740,36 @@ Expected: FAIL
 import { NextRequest } from 'next/server';
 import { HumanMessage } from '@langchain/core/messages';
 import { Command } from '@langchain/langgraph';
+import OpenAI from 'openai';
 import { createGraph } from '@/lib/agent';
 import { getCheckpointer } from '@/lib/checkpointer';
+import { getConversationByThreadId, updateConversationTitle } from '@/lib/conversations';
 import { PRODUCT_TOOL_NAMES } from '@/types';
 import type { StreamChunk } from '@/types';
 
+async function generateTitle(firstMessage: string): Promise<string> {
+  const client = new OpenAI();
+  const resp = await client.chat.completions.create({
+    model: process.env.SUMMARY_MODEL ?? 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'user',
+        content: `Generate a 4-6 word title for a shopping conversation that started with: "${firstMessage}". Reply with only the title, no punctuation.`,
+      },
+    ],
+    max_tokens: 20,
+  });
+  return resp.choices[0].message.content?.trim() ?? firstMessage.slice(0, 60);
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { threadId, message, resume } = body as {
+  const { threadId, message, resume, convId, isFirstMessage } = body as {
     threadId?: string;
     message: string;
     resume?: boolean;
+    convId?: string;
+    isFirstMessage?: boolean;
   };
 
   if (!threadId) {
@@ -1768,6 +1834,17 @@ export async function POST(req: NextRequest) {
             type: 'interrupt',
             question: typeof value === 'string' ? value : (value?.question ?? String(value)),
           });
+        }
+
+        // Generate and persist title after first assistant response
+        if (isFirstMessage && convId && !resume) {
+          try {
+            const title = await generateTitle(message);
+            updateConversationTitle(convId, title);
+            send({ type: 'title_update', title });
+          } catch {
+            // title generation is best-effort; don't fail the stream
+          }
         }
 
         send({ type: 'done' });
@@ -2864,11 +2941,13 @@ export function ChatShell() {
     let threadId = activeThreadId;
     let convId = activeConvId;
 
+    const isFirstMessage = !threadId;
+
     if (!threadId) {
       const res = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: input.slice(0, 60) }),
+        body: JSON.stringify({ title: 'New conversation' }),
       });
       const created = await res.json();
       threadId = created.threadId;
@@ -2892,7 +2971,7 @@ export function ChatShell() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ threadId, message: input, resume: pendingResume }),
+        body: JSON.stringify({ threadId, message: input, resume: pendingResume, convId, isFirstMessage }),
       });
 
       if (!res.ok || !res.body) throw new Error('Request failed');
@@ -2943,6 +3022,12 @@ export function ChatShell() {
             };
             setMessages(prev => [...prev, interruptMsg]);
             setPendingResume(true);
+          }
+
+          if (chunk.type === 'title_update' && chunk.title) {
+            setConversations(prev =>
+              prev.map(c => (c.id === convId ? { ...c, title: chunk.title! } : c))
+            );
           }
 
           if (chunk.type === 'done') {

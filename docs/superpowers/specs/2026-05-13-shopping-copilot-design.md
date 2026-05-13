@@ -182,6 +182,7 @@ The API route pipes the async iterator into a `ReadableStream`, serializing each
 | `tool_result` | `{ products: Product[] }` | Render `ProductGrid` |
 | `preference_added` | `{ key: string, value: string }` | Show dismissible chip, refresh `PreferencesPanel` |
 | `interrupt` | `{ question: string }` | Render clarifying question bubble; next POST includes `resume: true` |
+| `title_update` | `{ title: string }` | Update conversation title in sidebar |
 | `done` | — | Finalize message, stop spinner |
 
 The client reads `response.body` via `ReadableStream.getReader()`, parses each newline-delimited chunk, and dispatches to the appropriate UI update.
@@ -362,8 +363,12 @@ Single-column chat with a persistent left sidebar on desktop.
 
 ### New conversation
 1. Frontend POSTs to `/api/conversations`
-2. Server generates a UUID `thread_id`, inserts into metadata table, returns `{ threadId, id }`
-3. Frontend begins sending messages with that `thread_id`; first message content becomes the conversation title
+2. Server generates a UUID `thread_id`, inserts a placeholder title (`"New conversation"`), returns `{ threadId, id }`
+3. Frontend begins sending messages with that `thread_id`
+4. After the first assistant response completes, the chat route calls `SUMMARY_MODEL` with the first user message to generate a 4–6 word title, updates the `conversations` table, and emits a `title_update` chunk
+5. Frontend receives `title_update` and refreshes the sidebar — no page reload needed
+
+`conversations.ts` exposes an `updateConversationTitle(id, title)` function for this.
 
 ---
 
