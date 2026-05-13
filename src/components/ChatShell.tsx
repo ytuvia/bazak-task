@@ -82,6 +82,10 @@ export function ChatShell() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'New conversation' }),
       });
+      if (!res.ok) {
+        setError('Could not start a new conversation. Please try again.');
+        return;
+      }
       const created = await res.json();
       threadId = created.threadId;
       convId = created.id;
