@@ -23,10 +23,14 @@ export function ProductDetailModal({ product, onClose }: Props) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
         className="relative bg-slate-800 rounded-xl max-w-lg w-full mx-4 overflow-y-auto max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
         <button
+          aria-label="Close"
           onClick={onClose}
           className="absolute top-3 right-3 text-slate-400 hover:text-white text-xl"
         >
@@ -47,7 +51,7 @@ export function ProductDetailModal({ product, onClose }: Props) {
         )}
 
         <div className="p-5">
-          <h2 className="text-xl font-bold text-white">{product.title}</h2>
+          <h2 id="modal-title" className="text-xl font-bold text-white">{product.title}</h2>
           <p className="text-slate-400 text-sm mt-1">{product.brand}</p>
 
           <div className="flex items-center gap-4 mt-3">

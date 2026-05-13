@@ -37,7 +37,7 @@ export function MessageBubble({ message }: Props) {
   }
 
   if (message.role === 'tool') {
-    const isProductTool = PRODUCT_TOOL_NAMES.includes(message.toolName as any);
+    const isProductTool = (PRODUCT_TOOL_NAMES as ReadonlyArray<string>).includes(message.toolName ?? '');
     if (!isProductTool) return null;
 
     try {

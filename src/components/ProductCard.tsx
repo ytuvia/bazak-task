@@ -9,8 +9,9 @@ interface Props {
 export function ProductCard({ product, onClick }: Props) {
   return (
     <article
-      role="article"
+      tabIndex={0}
       onClick={() => onClick?.(product)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(product); } }}
       className="cursor-pointer rounded-lg border border-slate-700 bg-slate-800 overflow-hidden hover:border-blue-500 transition-colors"
     >
       <img
