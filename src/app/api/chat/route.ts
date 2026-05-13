@@ -24,17 +24,20 @@ async function generateTitle(firstMessage: string): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { threadId, message, resume, convId, isFirstMessage } = body as {
-    threadId?: string;
-    message: string;
-    resume?: boolean;
-    convId?: string;
-    isFirstMessage?: boolean;
-  };
+  let body: { threadId?: string; message: string; resume?: boolean; convId?: string; isFirstMessage?: boolean };
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const { threadId, message, resume, convId, isFirstMessage } = body;
 
   if (!threadId) {
     return Response.json({ error: 'threadId required' }, { status: 400 });
+  }
+
+  if (!message || typeof message !== 'string') {
+    return Response.json({ error: 'message required' }, { status: 400 });
   }
 
   const checkpointer = getCheckpointer();

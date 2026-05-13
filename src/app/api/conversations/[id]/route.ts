@@ -20,7 +20,7 @@ function serializeMessage(msg: BaseMessage): SerializedMessage {
       ? { toolCalls: aiMsg.tool_calls.map(tc => ({ name: tc.name, args: tc.args as Record<string, unknown>, id: tc.id ?? '' })) }
       : {}),
     ...(role === 'tool'
-      ? { toolCallId: toolMsg.tool_call_id, toolName: (toolMsg as any).name }
+      ? { toolCallId: toolMsg.tool_call_id, toolName: toolMsg.name }
       : {}),
   };
 }

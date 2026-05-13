@@ -10,7 +10,13 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { title } = await req.json();
-  const { id, threadId } = createConversation(title ?? 'New conversation');
+  let title: string;
+  try {
+    const body = await req.json();
+    title = typeof body.title === 'string' ? body.title : 'New conversation';
+  } catch {
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const { id, threadId } = createConversation(title);
   return Response.json({ id, threadId }, { status: 201 });
 }
