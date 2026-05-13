@@ -48,6 +48,7 @@ export function ProductDetailModal({ product, onClose }: Props) {
 
         <div className="p-5">
           <h2 className="text-xl font-bold text-white">{product.title}</h2>
+          <p className="text-slate-400 text-sm mt-1">{product.brand}</p>
 
           <div className="flex items-center gap-4 mt-3">
             <span className="text-2xl font-bold text-emerald-400">

@@ -13,7 +13,7 @@ export function PreferencesPanel({ preferences, onDelete, onClearAll }: Props) {
     <div className="border-t border-slate-700 px-3 py-3">
       <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">My Preferences</p>
       {keys.length === 0 ? (
-        <p className="text-xs text-slate-500">No preferences saved yet.</p>
+        <p className="text-xs text-slate-500">No preferences saved</p>
       ) : (
         <>
           <div className="flex flex-wrap gap-2">

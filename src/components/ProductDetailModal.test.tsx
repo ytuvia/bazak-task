@@ -26,7 +26,8 @@ describe('ProductDetailModal', () => {
 
   it('renders brand and rating', () => {
     render(<ProductDetailModal product={product} onClose={vi.fn()} />);
-    expect(screen.getByText(/Sony/)).toBeInTheDocument();
+    expect(screen.getByText('Sony WH-1000XM5')).toBeInTheDocument(); // title
+    expect(screen.getByText('Sony')).toBeInTheDocument(); // brand (exact match)
     expect(screen.getByText(/4\.8/)).toBeInTheDocument();
   });
 
