@@ -5,13 +5,33 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: 'node',
-    environmentMatchGlobs: [
-      ['src/components/**', 'jsdom'],
-      ['src/app/**', 'jsdom'],
-    ],
-    setupFiles: ['./src/test/setup.ts'],
     globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'node',
+          environment: 'node',
+          include: [
+            'src/lib/**/*.test.ts',
+            'src/app/**/*.test.ts',
+            'src/integration/**/*.test.ts',
+          ],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'jsdom',
+          environment: 'jsdom',
+          include: [
+            'src/components/**/*.test.tsx',
+            'src/components/**/*.test.ts',
+          ],
+        },
+      },
+    ],
   },
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
