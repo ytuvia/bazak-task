@@ -3156,10 +3156,97 @@ html, body {
 }
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Write failing test for `title_update` handling**
+
+```typescript
+// src/components/ChatShell.test.tsx
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { ChatShell } from './ChatShell';
+
+vi.mock('@/components/ConversationSidebar', () => ({
+  ConversationSidebar: ({ conversations }: any) => (
+    <div data-testid="sidebar">
+      {conversations.map((c: any) => (
+        <div key={c.id} data-testid={`conv-title-${c.id}`}>{c.title}</div>
+      ))}
+    </div>
+  ),
+}));
+
+vi.mock('@/components/MessageList', () => ({
+  MessageList: () => <div data-testid="message-list" />,
+}));
+
+function makeStream(chunks: object[]): ReadableStream {
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(encoder.encode(JSON.stringify(chunk) + '\n'));
+      }
+      controller.close();
+    },
+  });
+}
+
+describe('ChatShell', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, opts?: any) => {
+      if (url === '/api/conversations' && (!opts || opts.method === 'GET' || !opts.method)) {
+        return { ok: true, json: async () => [] };
+      }
+      if (url === '/api/conversations' && opts?.method === 'POST') {
+        return { ok: true, json: async () => ({ id: 'conv-1', threadId: 'thread-1' }) };
+      }
+      if (url === '/api/preferences') {
+        return { ok: true, json: async () => ({}) };
+      }
+      if (url === '/api/chat') {
+        return {
+          ok: true,
+          body: makeStream([
+            { type: 'token', content: 'Here are some options' },
+            { type: 'title_update', title: 'Wireless headphones search' },
+            { type: 'done' },
+          ]),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    }));
+  });
+
+  it('updates sidebar title when title_update chunk is received', async () => {
+    render(<ChatShell />);
+    const input = screen.getByPlaceholderText(/ask about products/i);
+    await userEvent.type(input, 'show me headphones');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => {
+      expect(screen.getByTestId('conv-title-conv-1').textContent).toBe('Wireless headphones search');
+    });
+  });
+});
+```
+
+- [ ] **Step 5: Run to verify it fails**
 
 ```bash
-git add src/components/ChatShell.tsx src/app/page.tsx src/app/globals.css
+npm test src/components/ChatShell.test.tsx
+```
+Expected: FAIL — module not found
+
+- [ ] **Step 6: Run to verify it passes after ChatShell is created**
+
+```bash
+npm test src/components/ChatShell.test.tsx
+```
+Expected: 1 test passes
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/components/ChatShell.tsx src/app/page.tsx src/app/globals.css src/components/ChatShell.test.tsx
 git commit -m "feat: add ChatShell and wire up root page"
 ```
 
