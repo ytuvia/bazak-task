@@ -1641,8 +1641,24 @@ const mockGraph = {
   getState: vi.fn(async () => ({ tasks: [] })),
 };
 
+const mockUpdateConversationTitle = vi.fn();
+
 vi.mock('@/lib/agent', () => ({ createGraph: vi.fn(() => mockGraph) }));
 vi.mock('@/lib/checkpointer', () => ({ getCheckpointer: vi.fn(() => ({})) }));
+vi.mock('@/lib/conversations', () => ({
+  updateConversationTitle: mockUpdateConversationTitle,
+}));
+vi.mock('openai', () => ({
+  default: vi.fn().mockImplementation(() => ({
+    chat: {
+      completions: {
+        create: vi.fn(async () => ({
+          choices: [{ message: { content: 'Wireless headphones search' } }],
+        })),
+      },
+    },
+  })),
+}));
 
 import { POST } from './route';
 
@@ -1696,21 +1712,6 @@ describe('POST /api/chat', () => {
   });
 
   it('emits title_update chunk on first message', async () => {
-    vi.mock('openai', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        chat: {
-          completions: {
-            create: vi.fn(async () => ({
-              choices: [{ message: { content: 'Wireless headphones search' } }],
-            })),
-          },
-        },
-      })),
-    }));
-    vi.mock('@/lib/conversations', () => ({
-      getConversationByThreadId: vi.fn(),
-      updateConversationTitle: vi.fn(),
-    }));
     const res = await POST(new NextRequest('http://localhost/api/chat', {
       method: 'POST',
       body: JSON.stringify({
@@ -1723,6 +1724,22 @@ describe('POST /api/chat', () => {
     const chunks = await collectChunks(res);
     const titleChunk = chunks.find((c: any) => c.type === 'title_update') as any;
     expect(titleChunk?.title).toBe('Wireless headphones search');
+    expect(mockUpdateConversationTitle).toHaveBeenCalledWith('conv-1', 'Wireless headphones search');
+  });
+
+  it('skips title generation when resume:true', async () => {
+    mockUpdateConversationTitle.mockClear();
+    await POST(new NextRequest('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        threadId: 'thread-1',
+        message: 'headphones',
+        convId: 'conv-1',
+        isFirstMessage: true,
+        resume: true,
+      }),
+    }));
+    expect(mockUpdateConversationTitle).not.toHaveBeenCalled();
   });
 });
 ```
@@ -2914,24 +2931,29 @@ export function ChatShell() {
   }, []);
 
   const startNewConversation = useCallback(async () => {
-    const res = await fetch('/api/conversations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'New conversation' }),
-    });
-    const { id, threadId } = await res.json();
-    const conv: Conversation = {
-      id,
-      threadId,
-      title: 'New conversation',
-      createdAt: new Date().toISOString(),
-    };
-    setConversations(prev => [conv, ...prev]);
-    setActiveConvId(id);
-    setActiveThreadId(threadId);
-    setMessages([]);
-    setPendingResume(false);
-    inputRef.current?.focus();
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'New conversation' }),
+      });
+      if (!res.ok) throw new Error('Failed to create conversation');
+      const { id, threadId } = await res.json();
+      const conv: Conversation = {
+        id,
+        threadId,
+        title: 'New conversation',
+        createdAt: new Date().toISOString(),
+      };
+      setConversations(prev => [conv, ...prev]);
+      setActiveConvId(id);
+      setActiveThreadId(threadId);
+      setMessages([]);
+      setPendingResume(false);
+      inputRef.current?.focus();
+    } catch {
+      setError('Could not start a new conversation. Please try again.');
+    }
   }, []);
 
   const sendMessage = useCallback(async () => {
