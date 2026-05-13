@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bazak — AI Shopping Copilot
 
-## Getting Started
+A locally runnable AI shopping assistant. Discover products through conversation — the assistant understands your intent, retrieves relevant results from the DummyJSON catalog, and renders product cards inline in the chat.
 
-First, run the development server:
+## Setup
+
+1. **Clone and install**
+   ```bash
+   git clone <repo-url> bazak
+   cd bazak
+   npm install
+   ```
+
+2. **Configure environment**
+   ```bash
+   cp .env.example .env.local
+   ```
+   Edit `.env.local` and set:
+   ```
+   OPENAI_API_KEY=your-key-here
+   ```
+   All other variables have sensible defaults.
+
+3. **Run**
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000).
+
+The SQLite database is created automatically at `data/bazak.db` on first run.
+
+## Tests
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm test            # run all tests once
+npm run test:watch  # watch mode
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Integration tests in `src/integration/` call the real OpenAI API and require `OPENAI_API_KEY` to be set in `.env.local`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Technical Choices
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### LangGraph for agent orchestration
+The core of the system is a hand-built LangGraph ReAct graph rather than a simple prompt-response loop. This gives us:
+- **Stateful threads** — every conversation is a LangGraph thread. The SQLite checkpointer snapshots the full agent state (messages, tool calls, summary) after every node, so threads survive page refreshes and server restarts.
+- **Summarization node** — when a thread exceeds `SUMMARY_MESSAGE_THRESHOLD` messages, a `summarize` node compresses earlier turns and trims the message list. Controlled via env var.
+- **Human-in-the-loop** — for vague queries, the agent calls `interrupt()` (a LangGraph primitive) before invoking any tool. The graph pauses, surfaces a clarifying question, and resumes from the exact checkpoint when the user responds.
 
-## Learn More
+### Intent extraction via tool calling
+There is no separate intent classifier. The LLM decides which tool to call — and that decision *is* the intent extraction. The system prompt describes when to use each of the four DummyJSON tools (`search_products`, `browse_category`, `list_categories`, `get_product`), and the model matches user queries to the right tool and parameters.
 
-To learn more about Next.js, take a look at the following resources:
+### Cross-thread memory (LangGraph Store)
+A `save_preference` tool lets the agent persist stable user preferences (budget, brand, category) to a SQLite-backed key-value store. Preferences persist across conversations and are injected into the system prompt on every agent invocation. Users can view and delete preferences via the sidebar panel.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Model selection
+- `AGENT_MODEL` (default: `gpt-4o-mini`) — used for the main agent node: intent understanding, tool selection, relevance filtering, response generation.
+- `SUMMARY_MODEL` (default: `gpt-4o-mini`) — used for the summarize node and title generation.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Streaming
+Responses stream token-by-token via HTTP `ReadableStream` (not SSE). The API route pipes LangGraph's async iterator into a `ReadableStream` and encodes each event as a newline-delimited JSON line with a `type` discriminator (`token`, `tool_result`, `preference_added`, `interrupt`, `done`).
 
-## Deploy on Vercel
+### Relevance filtering
+DummyJSON has no semantic ranking or price filter. The agent fetches up to `TOOL_RESULTS_LIMIT` results (default 10) and the LLM selects the 3–5 most relevant to present, taking price constraints and conversation context into account.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Environment Variables
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Variable | Default | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | — | Required. OpenAI API key. |
+| `AGENT_MODEL` | `gpt-4o-mini` | Model for agent node |
+| `SUMMARY_MODEL` | `gpt-4o-mini` | Model for summarize node and title generation |
+| `SUMMARY_MESSAGE_THRESHOLD` | `10` | Messages before summarization triggers |
+| `TOOL_RESULTS_LIMIT` | `10` | Max products fetched per tool call |
+| `DB_PATH` | `data/bazak.db` | SQLite file path |
