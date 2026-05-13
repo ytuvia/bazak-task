@@ -86,8 +86,12 @@ export const getProductTool = tool(
 
 export const savePreferenceTool = tool(
   async ({ key, value }) => {
-    setPreference(key, value);
-    return JSON.stringify({ saved: true, key, value });
+    try {
+      setPreference(key, value);
+      return JSON.stringify({ saved: true, key, value });
+    } catch {
+      return JSON.stringify({ saved: false, error: 'Could not save preference' });
+    }
   },
   {
     name: 'save_preference',
