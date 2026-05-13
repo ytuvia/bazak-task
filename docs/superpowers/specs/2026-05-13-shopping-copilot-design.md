@@ -36,9 +36,10 @@ Required env vars:
 ```
 OPENAI_API_KEY=              # OpenAI key — never commit this value
 AGENT_MODEL=                 # Model for the agent node (default: gpt-5.4-mini)
-SUMMARY_MODEL=               # Model for the summarize node (default: gpt-5.4-nano)
+SUMMARY_MODEL=               # Model for the summarize node and title generation (default: gpt-5.4-nano)
 SUMMARY_MESSAGE_THRESHOLD=   # Number of messages before summarization triggers (default: 10)
 TOOL_RESULTS_LIMIT=          # Max products fetched per tool call (default: 10)
+DB_PATH=                     # Optional: override default data/bazak.db path
 ```
 
 ---
@@ -168,17 +169,16 @@ Parallel tool execution is handled inside the `tools` node via `Promise.all` —
 
 ### Streaming
 
-The graph is invoked with `streamMode: ["messages", "updates"]`:
+The graph is invoked with `streamMode: "messages"`:
 
-- **`"messages"`** — emits `AIMessageChunk` objects token-by-token as the LLM generates them, plus complete `ToolMessage` objects when a tool node finishes. This drives the chat UI's real-time rendering.
-- **`"updates"`** — emits node-level state deltas on each node completion. Used to detect graph lifecycle events (e.g. when the `summarize` node fires).
+- **`"messages"`** — emits `AIMessageChunk` objects token-by-token as the LLM generates them, plus complete `ToolMessage` objects when a tool node finishes. Each stream event is a `[message, metadata]` tuple; the route destructures the first element. This drives the chat UI's real-time rendering.
 
 The API route pipes the async iterator into a `ReadableStream`, serializing each chunk as a newline-delimited JSON line with a `type` discriminator:
 
 | Chunk type | Payload | Frontend action |
 |---|---|---|
 | `token` | `{ content: string }` | Append to streaming text bubble |
-| `tool_call` | `{ name: string, args: object }` | Show `"Searching..."` indicator |
+| `tool_call` | `{ name: string }` | Show `"Searching..."` indicator |
 | `tool_result` | `{ products: Product[] }` | Render `ProductGrid` |
 | `preference_added` | `{ key: string, value: string }` | Show dismissible chip, refresh `PreferencesPanel` |
 | `interrupt` | `{ question: string }` | Render clarifying question bubble; next POST includes `resume: true` |
@@ -499,7 +499,9 @@ When the user's query is too vague to retrieve meaningful products ("show me som
 ### Graph mechanism
 Inside the agent node, if the LLM determines the query is insufficiently specific, it calls `interrupt(clarifyingQuestion)`. LangGraph automatically persists the interrupted state to the checkpoint and halts the graph. The interrupted state is indistinguishable from a completed turn in storage — the `thread_id` carries everything needed to resume.
 
-The agent decides when to interrupt via system prompt instruction: *"If the user's request is too vague to retrieve relevant products — no product type, category, or meaningful attribute mentioned — do not call a tool. Instead, call interrupt() with a short clarifying question."*
+The agent signals intent to clarify via a `request_clarification` pseudo-tool bound to the model alongside the product tools. The LLM calls `request_clarification({ question })` when it determines clarification is needed. The agent node intercepts this tool call (before `ToolNode` sees it), calls `interrupt(question)`, and pauses the graph. `request_clarification` is never added to `ToolNode`'s tool list — it is exclusively an interrupt trigger.
+
+The system prompt instructs: *"If the user's request is too vague to retrieve relevant products — no product type, category, or meaningful attribute mentioned — do not call a product tool. Instead, call request_clarification with a short clarifying question."*
 
 ### Graph edges update
 ```

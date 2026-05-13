@@ -980,6 +980,18 @@ export const savePreferenceTool = tool(
   }
 );
 
+export const requestClarificationTool = tool(
+  async () => JSON.stringify({ ok: true }),
+  {
+    name: 'request_clarification',
+    description:
+      "Signal that the user's request is too vague to retrieve relevant products. Use when no product type, category, or meaningful attribute is mentioned. Provide a short clarifying question.",
+    schema: z.object({
+      question: z.string().describe('A short clarifying question to ask the user'),
+    }),
+  }
+);
+
 export const PRODUCT_TOOLS = [
   searchProductsTool,
   browseCategoryTool,
@@ -988,6 +1000,9 @@ export const PRODUCT_TOOLS = [
 ];
 
 export const ALL_TOOLS = [...PRODUCT_TOOLS, savePreferenceTool];
+
+// Bound to the model but NOT processed by ToolNode — intercepted in agentNode via interrupt()
+export const AGENT_TOOLS = [...ALL_TOOLS, requestClarificationTool];
 ```
 
 - [ ] **Step 4: Run to verify it passes**
@@ -1123,7 +1138,7 @@ import {
   AIMessage,
   SystemMessage,
 } from '@langchain/core/messages';
-import { ALL_TOOLS, PRODUCT_TOOLS } from './tools';
+import { ALL_TOOLS, AGENT_TOOLS, PRODUCT_TOOLS } from './tools';
 import { getPreferences } from './store';
 import type { BaseCheckpointSaver } from '@langchain/langgraph';
 
@@ -1175,7 +1190,7 @@ async function agentNode(
   const model = new ChatOpenAI({
     model: process.env.AGENT_MODEL ?? 'gpt-5.4-mini',
     streaming: true,
-  }).bindTools(ALL_TOOLS);
+  }).bindTools(AGENT_TOOLS);
 
   const messages = [new SystemMessage(systemPrompt), ...state.messages];
   const response = await model.invoke(messages);
@@ -1760,7 +1775,7 @@ import { Command } from '@langchain/langgraph';
 import OpenAI from 'openai';
 import { createGraph } from '@/lib/agent';
 import { getCheckpointer } from '@/lib/checkpointer';
-import { getConversationByThreadId, updateConversationTitle } from '@/lib/conversations';
+import { updateConversationTitle } from '@/lib/conversations';
 import { PRODUCT_TOOL_NAMES } from '@/types';
 import type { StreamChunk } from '@/types';
 
