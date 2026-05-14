@@ -43,8 +43,8 @@ Integration tests in `src/integration/` call the real OpenAI API and require `OP
 ### LangGraph for agent orchestration
 The core of the system is a hand-built LangGraph ReAct graph rather than a simple prompt-response loop. This gives us:
 - **Stateful threads** — every conversation is a LangGraph thread. The SQLite checkpointer snapshots the full agent state (messages, tool calls, summary) after every node, so threads survive page refreshes and server restarts.
-- **Summarization node** — when a thread exceeds `SUMMARY_MESSAGE_THRESHOLD` messages, a `summarize` node compresses earlier turns and trims the message list. Controlled via env var.
-- **Human-in-the-loop** — for vague queries, the agent calls `interrupt()` (a LangGraph primitive) before invoking any tool. The graph pauses, surfaces a clarifying question, and resumes from the exact checkpoint when the user responds.
+- **Summarization node** — when a thread exceeds `SUMMARY_MESSAGE_THRESHOLD` messages, a `summarize` node compresses the conversation into a summary stored in graph state. The summary is injected into the system prompt on subsequent turns so context is preserved without growing the context window indefinitely.
+- **Message windowing** — `AGENT_MESSAGE_WINDOW` (default: 20) caps how many recent messages are sent to the LLM per turn, keeping latency and cost predictable for long threads.
 
 ### Intent extraction via tool calling
 There is no separate intent classifier. The LLM decides which tool to call — and that decision *is* the intent extraction. The system prompt describes when to use each of the four DummyJSON tools (`search_products`, `browse_category`, `list_categories`, `get_product`), and the model matches user queries to the right tool and parameters.
@@ -57,7 +57,7 @@ A `save_preference` tool lets the agent persist stable user preferences (budget,
 - `SUMMARY_MODEL` (default: `gpt-4o-mini`) — used for the summarize node and title generation.
 
 ### Streaming
-Responses stream token-by-token via HTTP `ReadableStream` (not SSE). The API route pipes LangGraph's async iterator into a `ReadableStream` and encodes each event as a newline-delimited JSON line with a `type` discriminator (`token`, `tool_result`, `preference_added`, `interrupt`, `done`).
+Responses stream token-by-token via HTTP `ReadableStream` (not SSE). The API route pipes LangGraph's async iterator into a `ReadableStream` and encodes each event as a newline-delimited JSON line with a `type` discriminator: `token`, `tool_call`, `tool_result`, `preference_added`, `title_update`, `done`, `error`. Only tokens from the `agent` node are forwarded — the `summarize` node's LLM output is filtered out so it never appears in the chat.
 
 ### Relevance filtering
 DummyJSON has no semantic ranking or price filter. The agent fetches up to `TOOL_RESULTS_LIMIT` results (default 10) and the LLM selects the 3–5 most relevant to present, taking price constraints and conversation context into account.
@@ -70,5 +70,6 @@ DummyJSON has no semantic ranking or price filter. The agent fetches up to `TOOL
 | `AGENT_MODEL` | `gpt-4o-mini` | Model for agent node |
 | `SUMMARY_MODEL` | `gpt-4o-mini` | Model for summarize node and title generation |
 | `SUMMARY_MESSAGE_THRESHOLD` | `10` | Messages before summarization triggers |
+| `AGENT_MESSAGE_WINDOW` | `20` | Max recent messages passed to the LLM per turn |
 | `TOOL_RESULTS_LIMIT` | `10` | Max products fetched per tool call |
 | `DB_PATH` | `data/bazak.db` | SQLite file path |
