@@ -2,12 +2,12 @@ import { NextRequest } from 'next/server';
 import { getConversationById, deleteConversation } from '@/lib/conversations';
 import { getCheckpointer } from '@/lib/checkpointer';
 import type { SerializedMessage } from '@/types';
-import { HumanMessage, AIMessage, ToolMessage, BaseMessage } from '@langchain/core/messages';
+import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage, BaseMessage } from '@langchain/core/messages';
 
 function serializeMessage(msg: BaseMessage): SerializedMessage {
   const role =
     msg instanceof HumanMessage ? 'human' :
-    msg instanceof AIMessage ? 'ai' : 'tool';
+    (msg instanceof AIMessage || msg instanceof AIMessageChunk) ? 'ai' : 'tool';
 
   const aiMsg = msg as AIMessage;
   const toolMsg = msg as ToolMessage;
