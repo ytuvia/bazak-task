@@ -18,7 +18,7 @@ async function generateTitle(userMessage: string, aiResponse: string): Promise<s
     ? `User: "${userMessage}"\nAssistant: "${aiResponse.slice(0, 300)}"`
     : `User: "${userMessage}"`;
   const resp = await client.chat.completions.create({
-    model: process.env.SUMMARY_MODEL ?? 'gpt-4o-mini',
+    model: process.env.SUMMARY_MODEL ?? 'gpt-5.4-nano',
     messages: [
       {
         role: 'user',

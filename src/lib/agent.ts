@@ -86,7 +86,7 @@ async function agentNode(
   const systemPrompt = buildSystemPrompt(preferences, state.summary, categories);
 
   const model = new ChatOpenAI({
-    model: process.env.AGENT_MODEL ?? 'gpt-4o-mini',
+    model: process.env.AGENT_MODEL ?? 'gpt-5.4-mini',
     streaming: true,
   }).bindTools(ALL_TOOLS);
 
@@ -102,7 +102,7 @@ async function summarizeNode(
   state: typeof StateAnnotation.State
 ): Promise<Partial<typeof StateAnnotation.State>> {
   const summaryModel = new ChatOpenAI({
-    model: process.env.SUMMARY_MODEL ?? 'gpt-4o-mini',
+    model: process.env.SUMMARY_MODEL ?? 'gpt-5.4-nano',
   });
 
   const conversationText = state.messages

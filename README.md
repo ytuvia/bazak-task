@@ -67,8 +67,8 @@ DummyJSON has no semantic ranking or price filter. The agent fetches up to `TOOL
 | Variable | Default | Description |
 |---|---|---|
 | `OPENAI_API_KEY` | — | Required. OpenAI API key. |
-| `AGENT_MODEL` | `gpt-4o-mini` | Model for agent node |
-| `SUMMARY_MODEL` | `gpt-4o-mini` | Model for summarize node and title generation |
+| `AGENT_MODEL` | `gpt-5.4-mini` | Model for agent node |
+| `SUMMARY_MODEL` | `gpt-5.4-nano` | Model for summarize node and title generation |
 | `SUMMARY_MESSAGE_THRESHOLD` | `10` | Messages before summarization triggers |
 | `AGENT_MESSAGE_WINDOW` | `20` | Max recent messages passed to the LLM per turn |
 | `TOOL_RESULTS_LIMIT` | `10` | Max products fetched per tool call |
