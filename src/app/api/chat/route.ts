@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
               if (chunk.name === 'save_preference' && parsed.saved) {
                 send({ type: 'preference_added', key: parsed.key as string, value: parsed.value as string });
               } else if (chunk.name && isProductToolName(chunk.name) && Array.isArray(parsed.products) && parsed.products.length > 0) {
-                send({ type: 'tool_result', products: parsed.products as StreamChunk['products'] });
+                send({ type: 'tool_result', name: chunk.name, products: parsed.products as StreamChunk['products'] });
               }
             } catch (err) {
               console.error('[chat] failed to parse tool message content:', err);

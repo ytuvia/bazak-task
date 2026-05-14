@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 import { getConversationById, deleteConversation } from '@/lib/conversations';
-import { getCheckpointer } from '@/lib/checkpointer';
+import { getCheckpointer, deleteCheckpointsByThreadId } from '@/lib/checkpointer';
+import { createGraph } from '@/lib/agent';
+import type { AgentState } from '@/lib/agent';
 import type { SerializedMessage } from '@/types';
 import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage, BaseMessage } from '@langchain/core/messages';
 
@@ -35,11 +37,11 @@ export async function GET(
 
   const checkpointer = getCheckpointer();
   const config = { configurable: { thread_id: conversation.threadId } };
-  const state = await checkpointer.get(config);
+  const state = await createGraph(checkpointer).getState(config);
 
-  if (!state) return Response.json([]);
+  if (!state?.values) return Response.json([]);
 
-  const messages: BaseMessage[] = (state.channel_values?.messages as BaseMessage[] | undefined) ?? [];
+  const messages: BaseMessage[] = (state.values as AgentState).messages ?? [];
   return Response.json(messages.map(serializeMessage));
 }
 
@@ -51,5 +53,6 @@ export async function DELETE(
   const conversation = getConversationById(id);
   if (!conversation) return Response.json({ error: 'Not found' }, { status: 404 });
   deleteConversation(id);
+  deleteCheckpointsByThreadId(conversation.threadId);
   return Response.json({ ok: true });
 }

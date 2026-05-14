@@ -28,7 +28,7 @@ async function getCategoryNames(): Promise<string[]> {
       _categoryNames = cats.map(c => c.name);
     } catch (err) {
       console.error('[agent] failed to fetch categories for prompt:', err);
-      _categoryNames = [];
+      return []; // don't cache — let the next request retry
     }
   }
   return _categoryNames;

@@ -18,8 +18,15 @@ vi.mock('@/lib/conversations', () => ({
   getConversationByThreadId: vi.fn(),
 }));
 
-vi.mock('@/lib/checkpointer', () => ({ getCheckpointer: vi.fn() }));
-vi.mock('@/lib/agent', () => ({ createGraph: vi.fn() }));
+vi.mock('@/lib/checkpointer', () => ({
+  getCheckpointer: vi.fn(),
+  deleteCheckpointsByThreadId: vi.fn(),
+}));
+vi.mock('@/lib/agent', () => ({
+  createGraph: vi.fn(() => ({
+    getState: vi.fn(async () => ({ values: { messages: [] } })),
+  })),
+}));
 
 import { GET, POST } from './route';
 import { GET as GETById, DELETE as DELETEById } from './[id]/route';

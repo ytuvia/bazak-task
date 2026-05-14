@@ -136,7 +136,7 @@ export function ChatShell() {
               id: crypto.randomUUID(),
               role: 'tool',
               content: JSON.stringify({ products: chunk.products, total: chunk.products.length }),
-              toolName: 'search_products',
+              toolName: chunk.name ?? 'search_products',
             };
             setMessages(prev => [...prev, toolMsg]);
           }
