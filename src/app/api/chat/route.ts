@@ -21,7 +21,7 @@ async function generateTitle(userMessage: string, aiResponse: string): Promise<s
         content: `Generate a 4-6 word title for a shopping conversation. Use the context below to capture what the conversation is actually about, not just the opening greeting.\n\n${context}\n\nReply with only the title, no punctuation.`,
       },
     ],
-    max_tokens: 20,
+    max_completion_tokens: 20,
   });
   return resp.choices[0].message.content?.trim() ?? userMessage.slice(0, 60);
 }
