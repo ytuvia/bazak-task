@@ -12,6 +12,7 @@ import {
   BaseMessage,
   HumanMessage,
   AIMessage,
+  AIMessageChunk,
   SystemMessage,
   RemoveMessage,
 } from '@langchain/core/messages';
@@ -136,12 +137,13 @@ export function shouldSummarize(
 
 function shouldContinue(state: typeof StateAnnotation.State): string {
   const last = state.messages[state.messages.length - 1];
-  if (
-    last instanceof AIMessage &&
-    last.tool_calls &&
-    last.tool_calls.length > 0
-  ) {
-    return 'tools';
+  if (last instanceof AIMessage || last instanceof AIMessageChunk) {
+    const toolCalls = (last as any).tool_calls ?? [];
+    const toolCallChunks = (last as any).tool_call_chunks ?? [];
+    const hasTools =
+      toolCalls.length > 0 ||
+      toolCallChunks.some((tc: any) => !!tc.name);
+    if (hasTools) return 'tools';
   }
   return shouldSummarize(state);
 }

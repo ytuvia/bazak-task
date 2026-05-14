@@ -59,12 +59,16 @@ export async function POST(req: NextRequest) {
 
         const graphStream = await graph.stream(input as any, config);
 
+        let tokensSent = false;
+
         for await (const [chunk] of graphStream as unknown as AsyncIterable<[any, any]>) {
           if (!chunk) continue;
           const type = chunk._getType?.();
-
           if (type === 'AIMessageChunk' || type === 'ai') {
-            if (chunk.content) send({ type: 'token', content: chunk.content });
+            if (chunk.content) {
+              send({ type: 'token', content: chunk.content });
+              tokensSent = true;
+            }
             for (const tc of chunk.tool_call_chunks ?? []) {
               if (tc.name && PRODUCT_TOOL_NAMES.includes(tc.name as any)) {
                 send({ type: 'tool_call', name: tc.name });
@@ -91,6 +95,15 @@ export async function POST(req: NextRequest) {
 
         // Check for interrupt after stream ends
         const state = await graph.getState(config);
+
+        // Fallback: if no tokens streamed, pull the final AI message from state
+        if (!tokensSent) {
+          const msgs: any[] = (state.values as any)?.messages ?? [];
+          const lastMsg = msgs[msgs.length - 1];
+          if (lastMsg?._getType?.() === 'ai' && typeof lastMsg.content === 'string' && lastMsg.content) {
+            send({ type: 'token', content: lastMsg.content });
+          }
+        }
         const interrupts = state.tasks.flatMap((t: any) => t.interrupts ?? []);
         if (interrupts.length > 0) {
           const value = interrupts[0].value;
