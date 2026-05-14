@@ -10,7 +10,8 @@ const limit = (): number =>
 async function safeResult(fn: () => Promise<ToolResult>): Promise<string> {
   try {
     return JSON.stringify(await fn());
-  } catch {
+  } catch (err) {
+    console.error('[tool] DummyJSON fetch failed:', err);
     return JSON.stringify({
       products: [],
       total: 0,
@@ -56,7 +57,8 @@ export const listCategoriesTool = tool(
     try {
       const categories = await fetchCategories();
       return JSON.stringify({ categories, products: [], total: 0 });
-    } catch {
+    } catch (err) {
+      console.error('[tool] list_categories fetch failed:', err);
       return JSON.stringify({
         categories: [],
         products: [],
@@ -89,7 +91,8 @@ export const savePreferenceTool = tool(
     try {
       setPreference(key, value);
       return JSON.stringify({ saved: true, key, value });
-    } catch {
+    } catch (err) {
+      console.error('[tool] save_preference failed:', err);
       return JSON.stringify({ saved: false, error: 'Could not save preference' });
     }
   },

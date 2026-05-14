@@ -90,8 +90,8 @@ export async function POST(req: NextRequest) {
               ) {
                 send({ type: 'tool_result', products: parsed.products });
               }
-            } catch {
-              // non-JSON tool content, skip
+            } catch (err) {
+              console.error('[chat] failed to parse tool message content:', err);
             }
           }
         }
@@ -127,13 +127,14 @@ export async function POST(req: NextRequest) {
             const title = await generateTitle(message, aiResponse);
             updateConversationTitle(convId, title);
             send({ type: 'title_update', title });
-          } catch {
-            // title generation is best-effort
+          } catch (err) {
+            console.error('[chat] title generation failed:', err);
           }
         }
 
         send({ type: 'done' });
-      } catch {
+      } catch (err) {
+        console.error('[chat] stream handler failed:', err);
         send({ type: 'error', message: 'Request failed' });
       }
       controller.close();
