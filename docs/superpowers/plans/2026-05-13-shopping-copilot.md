@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a locally runnable AI shopping copilot with conversational product discovery, inline product cards, LangGraph + SQLite persistence, cross-thread preference memory, summarization, and human-in-the-loop clarification.
+**Goal:** Build a locally runnable AI shopping copilot with conversational product discovery, inline product cards, LangGraph + SQLite persistence, cross-thread preference memory, and summarization.
+
+> **Note:** Human-in-the-loop clarification (interrupt/resume flow) was removed during implementation due to added complexity. The agent handles vague queries conversationally. See the spec's "Future Features" section for the deferred design.
 
 **Architecture:** Next.js 14 App Router with a hand-built LangGraph ReAct graph. SQLite checkpointer for in-thread persistence; custom SQLite tables for conversations metadata and user preferences. OpenAI tool calling dispatches to four DummyJSON endpoints. A `summarize` node compresses long threads. Streaming via `ReadableStream` + newline-delimited JSON.
 
@@ -24,7 +26,7 @@ src/
 │   ├── page.tsx                              # Root — renders ChatShell
 │   ├── globals.css
 │   └── api/
-│       ├── chat/route.ts                     # POST — stream agent or resume interrupt
+│       ├── chat/route.ts                     # POST — stream agent response
 │       ├── conversations/
 │       │   ├── route.ts                      # GET list, POST new
 │       │   └── [id]/route.ts                 # GET messages, DELETE
@@ -3343,7 +3345,7 @@ Integration tests in `src/integration/` call the real OpenAI API and require `OP
 The core of the system is a hand-built LangGraph ReAct graph rather than a simple prompt-response loop. This gives us:
 - **Stateful threads** — every conversation is a LangGraph thread. The SQLite checkpointer snapshots the full agent state (messages, tool calls, summary) after every node, so threads survive page refreshes and server restarts.
 - **Summarization node** — when a thread exceeds `SUMMARY_MESSAGE_THRESHOLD` messages, a `summarize` node compresses earlier turns and trims the message list. Controlled via env var.
-- **Human-in-the-loop** — for vague queries, the agent calls `interrupt()` (a LangGraph primitive) before invoking any tool. The graph pauses, surfaces a clarifying question, and resumes from the exact checkpoint when the user responds.
+- **Summarization** keeps long threads manageable for the LLM while a separate `messages` table in SQLite preserves the full display history regardless of what the summarizer prunes.
 
 ### Intent extraction via tool calling
 There is no separate intent classifier. The LLM decides which tool to call — and that decision *is* the intent extraction. The system prompt describes when to use each of the four DummyJSON tools (`search_products`, `browse_category`, `list_categories`, `get_product`), and the model matches user queries to the right tool and parameters.
@@ -3356,7 +3358,7 @@ A `save_preference` tool lets the agent persist stable user preferences (budget,
 - `SUMMARY_MODEL` (default: `gpt-5.4-nano`) — used for the summarize node: a compression task that doesn't require the full model's reasoning capability.
 
 ### Streaming
-Responses stream token-by-token via HTTP `ReadableStream` (not SSE). The API route pipes LangGraph's async iterator into a `ReadableStream` and encodes each event as a newline-delimited JSON line with a `type` discriminator (`token`, `tool_result`, `preference_added`, `interrupt`, `done`).
+Responses stream token-by-token via HTTP `ReadableStream` (not SSE). The API route pipes LangGraph's async iterator into a `ReadableStream` and encodes each event as a newline-delimited JSON line with a `type` discriminator (`token`, `tool_result`, `preference_added`, `done`).
 
 ### Relevance filtering
 DummyJSON has no semantic ranking or price filter. The agent fetches up to `TOOL_RESULTS_LIMIT` results (default 10) and the LLM selects the 3–5 most relevant to present, taking price constraints and conversation context into account.

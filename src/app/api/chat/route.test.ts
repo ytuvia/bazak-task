@@ -72,16 +72,6 @@ describe('POST /api/chat', () => {
     expect(chunks[chunks.length - 1]).toEqual({ type: 'done' });
   });
 
-  it('passes resume Command when resume:true', async () => {
-    await POST(new NextRequest('http://localhost/api/chat', {
-      method: 'POST',
-      body: JSON.stringify({ threadId: 'thread-1', message: 'headphones', resume: true }),
-    }));
-    const { Command } = await import('@langchain/langgraph');
-    const callArg = mockGraph.stream.mock.calls.at(-1)?.[0];
-    expect(callArg).toBeInstanceOf(Command);
-  });
-
   it('emits title_update chunk on first message', async () => {
     const res = await POST(new NextRequest('http://localhost/api/chat', {
       method: 'POST',
@@ -98,18 +88,4 @@ describe('POST /api/chat', () => {
     expect(mockUpdateConversationTitle).toHaveBeenCalledWith('conv-1', 'Wireless headphones search');
   });
 
-  it('skips title generation when resume:true', async () => {
-    mockUpdateConversationTitle.mockClear();
-    await POST(new NextRequest('http://localhost/api/chat', {
-      method: 'POST',
-      body: JSON.stringify({
-        threadId: 'thread-1',
-        message: 'headphones',
-        convId: 'conv-1',
-        isFirstMessage: true,
-        resume: true,
-      }),
-    }));
-    expect(mockUpdateConversationTitle).not.toHaveBeenCalled();
-  });
 });

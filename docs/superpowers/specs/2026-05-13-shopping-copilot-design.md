@@ -53,7 +53,7 @@ src/
 ├── app/
 │   ├── page.tsx                          # Root — renders ChatShell
 │   └── api/
-│       ├── chat/route.ts                 # POST — invokes LangGraph agent or resumes from interrupt, returns streaming HTTP response (ReadableStream)
+│       ├── chat/route.ts                 # POST — invokes LangGraph agent, returns streaming HTTP response (ReadableStream)
 │       ├── conversations/
 │       │   ├── route.ts                  # GET list, POST new (creates thread_id)
 │       │   └── [id]/
@@ -181,7 +181,6 @@ The API route pipes the async iterator into a `ReadableStream`, serializing each
 | `tool_call` | `{ name: string }` | Show `"Searching..."` indicator |
 | `tool_result` | `{ products: Product[] }` | Render `ProductGrid` |
 | `preference_added` | `{ key: string, value: string }` | Show dismissible chip, refresh `PreferencesPanel` |
-| `interrupt` | `{ question: string }` | Render clarifying question bubble; next POST includes `resume: true` |
 | `title_update` | `{ title: string }` | Update conversation title in sidebar |
 | `done` | — | Finalize message, stop spinner |
 
@@ -343,17 +342,10 @@ Single-column chat with a persistent left sidebar on desktop.
 ### Sending a new message
 1. Frontend POSTs `{ threadId, message }` to `/api/chat`
 2. Route appends a `HumanMessage` and invokes the graph with `streamMode: ["messages", "updates"]` and `thread_id` config
-3. Graph runs: agent reads Store preferences → LLM responds, calls tools, or interrupts → tools execute in parallel if called → agent resumes → summarize check → END
+3. Graph runs: agent reads Store preferences → LLM responds, calls tools → tools execute in parallel if called → agent resumes → summarize check → END
 4. LangGraph checkpoints state and updates the Store after each node
 5. Route pipes the LangGraph async iterator into a `ReadableStream`, encoding each chunk as newline-delimited JSON with a `type` field
-6. Frontend dispatches: `token` → append text, `tool_call` → show "Searching…", `tool_result` → render `ProductGrid`, `interrupt` → render clarifying question bubble, `done` → finalize
-
-### Resuming from a clarification interrupt
-1. User responds to the clarifying question in the chat input
-2. Frontend POSTs `{ threadId, message, resume: true }` to `/api/chat`
-3. Route calls `graph.stream(new Command({ resume: userMessage }), config)` — no new `HumanMessage` appended
-4. Graph resumes from the interrupt point in the agent node with the user's clarification
-5. Agent proceeds normally — calls a tool, streams results, finalizes
+6. Frontend dispatches: `token` → append text, `tool_call` → show "Searching…", `tool_result` → render `ProductGrid`, `done` → finalize
 
 ### Resuming a thread
 1. User clicks a past thread in the sidebar
@@ -431,9 +423,6 @@ Instantiate the full LangGraph graph with `MemorySaver` (no SQLite) and `msw` in
 - Send `SUMMARY_MESSAGE_THRESHOLD + 2` messages → `summarize` node fires; `state.summary` is a non-empty string; `state.messages.length` equals 4
 
 **Human-in-the-loop:**
-- `"show me something nice"` → graph interrupts; interrupt value is a non-empty clarifying question string
-- Resume with `new Command({ resume: "wireless headphones" })` → `search_products` called; final state contains product results
-
 **Cross-thread Store:**
 - Send a message expressing a preference ("I always buy Nike") → Store entry written under `("user", "preferences")`
 - Create a new thread with the same Store instance → agent system prompt for the new thread includes the stored preference
@@ -446,14 +435,13 @@ Instantiate the full LangGraph graph with `MemorySaver` (no SQLite) and `msw` in
 
 **`POST /api/chat`:**
 - New message with valid `threadId` → streamed response body contains `tool_result` chunk followed by `token` chunks and `done` chunk
-- `resume: true` with a previously interrupted thread → graph resumes; streamed response contains product results
 - Missing `threadId` → 400 response
 
 **`GET /api/conversations`:** returns array ordered by `created_at` descending
 
 **`POST /api/conversations`:** creates new thread; response contains `{ id, threadId }`; subsequent `GET /api/conversations` includes it
 
-**`GET /api/conversations/[id]`:** returns message list reconstructed from checkpoint; unknown `id` → 404
+**`GET /api/conversations/[id]`:** returns message list from the messages table; unknown `id` → 404
 
 **`DELETE /api/conversations/[id]`:** removes metadata row; subsequent `GET /api/conversations` excludes it
 
@@ -492,42 +480,15 @@ Instantiate the full LangGraph graph with `MemorySaver` (no SQLite) and `msw` in
 
 ---
 
-## Human-in-the-Loop
+## Future Features
 
-When the user's query is too vague to retrieve meaningful products ("show me something nice", "I need a gift"), the agent interrupts before calling any tool, surfaces a clarifying question, and resumes once the user responds.
+### Human-in-the-Loop Clarification
 
-### Graph mechanism
-Inside the agent node, if the LLM determines the query is insufficiently specific, it calls `interrupt(clarifyingQuestion)`. LangGraph automatically persists the interrupted state to the checkpoint and halts the graph. The interrupted state is indistinguishable from a completed turn in storage — the `thread_id` carries everything needed to resume.
+When the user's request is too vague to retrieve meaningful products ("show me something nice", "I need a gift"), a future version of the agent could pause and ask a clarifying question before proceeding.
 
-The agent signals intent to clarify via a `request_clarification` pseudo-tool bound to the model alongside the product tools. The LLM calls `request_clarification({ question })` when it determines clarification is needed. The agent node intercepts this tool call (before `ToolNode` sees it), calls `interrupt(question)`, and pauses the graph. `request_clarification` is never added to `ToolNode`'s tool list — it is exclusively an interrupt trigger.
+**Proposed mechanism:** LangGraph's `interrupt()` primitive pauses graph execution at any node and serializes the interrupted state to the checkpoint. The agent would detect a vague request (via a `request_clarification` pseudo-tool call), call `interrupt({ question })`, and halt. The API route would detect the interrupt and emit an `interrupt` chunk to the frontend. The frontend would render the question as an assistant bubble and, when the user responds, POST with `resume: true`, causing the route to call `graph.stream(new Command({ resume: userMessage }), config)` to resume from the saved checkpoint.
 
-The system prompt instructs: *"If the user's request is too vague to retrieve relevant products — no product type, category, or meaningful attribute mentioned — do not call a product tool. Instead, call request_clarification with a short clarifying question."*
-
-### Graph edges update
-```
-START → agent
-agent → tools              (if LLM returned one or more tool calls)
-agent → interrupt          (if LLM called interrupt() — graph pauses)
-agent → should_summarize   (if LLM returned a text response — turn complete)
-tools → agent
-should_summarize → summarize   (if message count > SUMMARY_MESSAGE_THRESHOLD)
-should_summarize → END         (otherwise)
-summarize → END
-```
-
-### API route — two invocation paths
-`/api/chat` handles two cases distinguished by `body.resume`:
-
-- **New message** (`resume` absent): append `HumanMessage` and call `graph.stream(messages, config)`
-- **Resume from interrupt** (`resume: true`): call `graph.stream(new Command({ resume: userMessage }), config)` — no new `HumanMessage` appended; LangGraph resumes the graph from the interrupt point
-
-### Stream protocol addition
-| Chunk type | Payload | Frontend action |
-|---|---|---|
-| `interrupt` | `{ question: string }` | Render clarifying question as assistant bubble; next user message POSTs with `resume: true` |
-
-### Frontend behaviour
-On receiving an `interrupt` chunk, the frontend renders the clarifying question as a normal assistant text bubble. The input bar remains active. When the user responds, the POST to `/api/chat` includes `{ threadId, message, resume: true }`. The response flows through the normal streaming path — the agent resumes, calls a tool, and returns products as usual.
+**Why deferred:** The interrupt/resume flow adds meaningful complexity — a two-mode API route, extra client state, and a separate message-persistence concern (interrupted questions live in `state.tasks`, not `state.messages`). The agent handles vague requests adequately today by responding conversationally and inviting the user to be more specific. Human-in-the-loop is a worthwhile investment once the core product discovery UX is stable.
 
 ---
 

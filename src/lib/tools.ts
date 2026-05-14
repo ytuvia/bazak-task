@@ -107,18 +107,6 @@ export const savePreferenceTool = tool(
   }
 );
 
-export const requestClarificationTool = tool(
-  async () => JSON.stringify({ ok: true }),
-  {
-    name: 'request_clarification',
-    description:
-      "Signal that the user's request is too vague to retrieve relevant products. Use when no product type, category, or meaningful attribute is mentioned. Provide a short clarifying question.",
-    schema: z.object({
-      question: z.string().describe('A short clarifying question to ask the user'),
-    }),
-  }
-);
-
 export const PRODUCT_TOOLS = [
   searchProductsTool,
   browseCategoryTool,
@@ -127,6 +115,3 @@ export const PRODUCT_TOOLS = [
 ];
 
 export const ALL_TOOLS = [...PRODUCT_TOOLS, savePreferenceTool];
-
-// Bound to the model but NOT processed by ToolNode — intercepted in agentNode via interrupt()
-export const AGENT_TOOLS = [...ALL_TOOLS, requestClarificationTool];

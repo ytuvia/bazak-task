@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { MessageBubble } from './MessageBubble';
+import { MemoizedMarkdown } from './MemoizedMarkdown';
 import type { SerializedMessage } from '@/types';
 
 interface Props {
@@ -11,10 +12,14 @@ interface Props {
 
 export function MessageList({ messages, isStreaming, streamingText }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const prevLengthRef = useRef(0);
 
   useEffect(() => {
-    if (isStreaming || streamingText) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const wasEmpty = prevLengthRef.current === 0;
+    prevLengthRef.current = messages.length;
+    // Scroll on: initial history load (0→N), or active streaming
+    if (wasEmpty || isStreaming || streamingText) {
+      bottomRef.current?.scrollIntoView({ behavior: wasEmpty ? 'instant' : 'smooth' });
     }
   }, [isStreaming, streamingText, messages.length]);
 
@@ -37,7 +42,7 @@ export function MessageList({ messages, isStreaming, streamingText }: Props) {
       {isStreaming && streamingText && (
         <div className="flex justify-start">
           <div className="max-w-[80%] rounded-2xl rounded-bl-sm bg-slate-700 px-4 py-2 text-sm text-slate-100">
-            {streamingText}
+            <MemoizedMarkdown content={streamingText} id="streaming" />
             <span className="inline-block w-1 h-3 ml-1 bg-blue-400 animate-pulse" />
           </div>
         </div>

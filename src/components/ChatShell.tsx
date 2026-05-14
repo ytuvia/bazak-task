@@ -13,7 +13,6 @@ export function ChatShell() {
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState('');
-  const [pendingResume, setPendingResume] = useState(false);
   const [preferenceNotice, setPreferenceNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -36,7 +35,7 @@ export function ChatShell() {
   const selectConversation = useCallback(async (conv: Conversation) => {
     setActiveConvId(conv.id);
     setActiveThreadId(conv.threadId);
-    setPendingResume(false);
+    setMessages([]);
     const res = await fetch(`/api/conversations/${conv.id}`);
     setMessages(res.ok ? await res.json() : []);
   }, []);
@@ -60,7 +59,6 @@ export function ChatShell() {
       setActiveConvId(id);
       setActiveThreadId(threadId);
       setMessages([]);
-      setPendingResume(false);
       inputRef.current?.focus();
     } catch {
       setError('Could not start a new conversation. Please try again.');
@@ -108,12 +106,11 @@ export function ChatShell() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ threadId, message: input, resume: pendingResume, convId, isFirstMessage }),
+        body: JSON.stringify({ threadId, message: input, convId, isFirstMessage }),
       });
 
       if (!res.ok || !res.body) throw new Error('Request failed');
 
-      setPendingResume(false);
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -150,16 +147,6 @@ export function ChatShell() {
             await loadPreferences();
           }
 
-          if (chunk.type === 'interrupt' && chunk.question) {
-            const interruptMsg: SerializedMessage = {
-              id: crypto.randomUUID(),
-              role: 'ai',
-              content: chunk.question,
-            };
-            setMessages(prev => [...prev, interruptMsg]);
-            setPendingResume(true);
-          }
-
           if (chunk.type === 'title_update' && chunk.title) {
             setConversations(prev =>
               prev.map(c => (c.id === convId ? { ...c, title: chunk.title! } : c))
@@ -185,7 +172,7 @@ export function ChatShell() {
       setIsStreaming(false);
       setStreamingText('');
     }
-  }, [input, isStreaming, activeThreadId, activeConvId, pendingResume, messages, loadConversations, loadPreferences]);
+  }, [input, isStreaming, activeThreadId, activeConvId, messages, loadConversations, loadPreferences]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -252,7 +239,7 @@ export function ChatShell() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isStreaming}
-              placeholder={pendingResume ? 'Answer the question above…' : 'Ask about products…'}
+              placeholder="Ask about products…"
               className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:outline-none disabled:opacity-50"
             />
             <button

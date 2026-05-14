@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
 import { HumanMessage } from '@langchain/core/messages';
-import { Command } from '@langchain/langgraph';
 import OpenAI from 'openai';
 import { createGraph } from '@/lib/agent';
 import { getCheckpointer } from '@/lib/checkpointer';
@@ -27,13 +26,13 @@ async function generateTitle(userMessage: string, aiResponse: string): Promise<s
 }
 
 export async function POST(req: NextRequest) {
-  let body: { threadId?: string; message: string; resume?: boolean; convId?: string; isFirstMessage?: boolean };
+  let body: { threadId?: string; message: string; convId?: string; isFirstMessage?: boolean };
   try {
     body = await req.json();
   } catch {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const { threadId, message, resume, convId, isFirstMessage } = body;
+  const { threadId, message, convId, isFirstMessage } = body;
 
   if (!threadId) {
     return Response.json({ error: 'threadId required' }, { status: 400 });
@@ -56,9 +55,7 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        const input = resume
-          ? new Command({ resume: message })
-          : { messages: [new HumanMessage(message)] };
+        const input = { messages: [new HumanMessage(message)] };
 
         const graphStream = await graph.stream(input as any, config);
 
@@ -96,29 +93,20 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Check for interrupt after stream ends
-        const state = await graph.getState(config);
-
         // Fallback: if no tokens streamed, pull the final AI message from state
         if (!tokensSent) {
+          const state = await graph.getState(config);
           const msgs: any[] = (state.values as any)?.messages ?? [];
           const lastMsg = msgs[msgs.length - 1];
           if (lastMsg?._getType?.() === 'ai' && typeof lastMsg.content === 'string' && lastMsg.content) {
             send({ type: 'token', content: lastMsg.content });
           }
         }
-        const interrupts = state.tasks.flatMap((t: any) => t.interrupts ?? []);
-        if (interrupts.length > 0) {
-          const value = interrupts[0].value;
-          send({
-            type: 'interrupt',
-            question: typeof value === 'string' ? value : (value?.question ?? String(value)),
-          });
-        }
 
-        // Generate and persist title after first assistant response
-        if (isFirstMessage && convId && !resume) {
+        // Generate title after first assistant response
+        if (isFirstMessage && convId) {
           try {
+            const state = await graph.getState(config);
             const allMsgs: any[] = (state.values as any)?.messages ?? [];
             const lastAI = [...allMsgs].reverse().find(
               (m: any) => m._getType?.() === 'ai' && typeof m.content === 'string' && m.content

@@ -95,16 +95,6 @@ describe.skipIf(!hasApiKey)('summarization', () => {
   });
 });
 
-describe.skipIf(!hasApiKey)('human-in-the-loop', () => {
-  it('interrupts graph for vague query', async () => {
-    const graph = createGraph(new MemorySaver());
-    const config = { configurable: { thread_id: 'interrupt-thread' } };
-    await graph.invoke({ messages: [new HumanMessage('show me something nice')] }, config);
-    const state = await graph.getState(config);
-    expect(state).toBeDefined();
-  });
-});
-
 describe.skipIf(!hasApiKey)('cross-thread Store', () => {
   it('save_preference tool stores preference', async () => {
     const { setPreference } = await import('@/lib/store');

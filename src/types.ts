@@ -32,7 +32,6 @@ export type StreamChunkType =
   | 'tool_call'
   | 'tool_result'
   | 'preference_added'
-  | 'interrupt'
   | 'title_update'
   | 'done'
   | 'error';
@@ -44,7 +43,6 @@ export interface StreamChunk {
   products?: Product[];
   key?: string;
   value?: string;
-  question?: string;
   title?: string;
   message?: string;
 }
