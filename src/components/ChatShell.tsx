@@ -171,6 +171,7 @@ export function ChatShell() {
     } finally {
       setIsStreaming(false);
       setStreamingText('');
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [input, isStreaming, activeThreadId, activeConvId, messages, loadConversations, loadPreferences]);
 
