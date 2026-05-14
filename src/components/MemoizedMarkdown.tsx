@@ -1,6 +1,6 @@
 'use client';
 import { marked } from 'marked';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -59,7 +59,12 @@ MemoizedMarkdownBlock.displayName = 'MemoizedMarkdownBlock';
 
 export const MemoizedMarkdown = memo(
   ({ content, id }: { content: string; id: string }) => {
-    const blocks = useMemo(() => parseMarkdownIntoBlocks(content), [content]);
+    // During streaming (id === "streaming") skip block-splitting to avoid O(n²) re-parsing.
+    // Block memoization only pays off for stable, completed messages.
+    if (id === 'streaming') {
+      return <MemoizedMarkdownBlock content={content} />;
+    }
+    const blocks = parseMarkdownIntoBlocks(content);
     return (
       <>
         {blocks.map((block, index) => (

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage } from '@langchain/core/messages';
-import OpenAI from 'openai';
+import { ChatOpenAI } from '@langchain/openai';
 import { createGraph } from '@/lib/agent';
 import { getCheckpointer } from '@/lib/checkpointer';
 import { updateConversationTitle } from '@/lib/conversations';
@@ -13,21 +13,14 @@ function isProductToolName(name: string): boolean {
 }
 
 async function generateTitle(userMessage: string, aiResponse: string): Promise<string> {
-  const client = new OpenAI();
   const context = aiResponse
     ? `User: "${userMessage}"\nAssistant: "${aiResponse.slice(0, 300)}"`
     : `User: "${userMessage}"`;
-  const resp = await client.chat.completions.create({
-    model: process.env.SUMMARY_MODEL ?? 'gpt-5.4-nano',
-    messages: [
-      {
-        role: 'user',
-        content: `Generate a 4-6 word title for a shopping conversation. Use the context below to capture what the conversation is actually about, not just the opening greeting.\n\n${context}\n\nReply with only the title, no punctuation.`,
-      },
-    ],
-    max_completion_tokens: 20,
-  });
-  return resp.choices[0].message.content?.trim() ?? userMessage.slice(0, 60);
+  const model = new ChatOpenAI({ model: process.env.SUMMARY_MODEL ?? 'gpt-5.4-nano', maxTokens: 20 });
+  const res = await model.invoke(
+    `Generate a 4-6 word title for a shopping conversation. Use the context below to capture what the conversation is actually about, not just the opening greeting.\n\n${context}\n\nReply with only the title, no punctuation.`
+  );
+  return (typeof res.content === 'string' ? res.content.trim() : '') || userMessage.slice(0, 60);
 }
 
 export async function POST(req: NextRequest) {

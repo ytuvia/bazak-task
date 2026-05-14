@@ -12,20 +12,28 @@ interface Props {
   onClearPreferences: () => void;
 }
 
+function toDateString(d: Date) {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
 function groupByRecency(conversations: Conversation[]) {
   const now = new Date();
+  const todayStr = toDateString(now);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = toDateString(yesterday);
+
   const today: Conversation[] = [];
-  const yesterday: Conversation[] = [];
+  const yesterdayGroup: Conversation[] = [];
   const older: Conversation[] = [];
 
   for (const conv of conversations) {
-    const d = new Date(conv.createdAt);
-    const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
-    if (diffDays === 0) today.push(conv);
-    else if (diffDays === 1) yesterday.push(conv);
+    const str = toDateString(new Date(conv.createdAt));
+    if (str === todayStr) today.push(conv);
+    else if (str === yesterdayStr) yesterdayGroup.push(conv);
     else older.push(conv);
   }
-  return { today, yesterday, older };
+  return { today, yesterday: yesterdayGroup, older };
 }
 
 function ThreadGroup({ label, items, activeId, onSelect }: {

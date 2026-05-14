@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import type { Product } from '@/types';
 
 interface Props {
@@ -17,10 +18,12 @@ export function ProductCard({ product, onClick }: Props) {
       className="cursor-pointer rounded-xl border border-slate-700 bg-slate-800 overflow-hidden hover:border-blue-500 hover:shadow-lg hover:shadow-blue-900/20 transition-all duration-150 flex flex-col"
     >
       <div className="relative bg-slate-900 flex items-center justify-center" style={{ aspectRatio: '4/3' }}>
-        <img
+        <Image
           src={product.thumbnail}
           alt={product.title}
-          className="w-full h-full object-contain p-2"
+          fill
+          sizes="(max-width: 640px) 50vw, 33vw"
+          className="object-contain p-2"
         />
         {discounted && (
           <span className="absolute top-2 left-2 rounded-md bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">

@@ -1,5 +1,6 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import Image from 'next/image';
 import type { Product } from '@/types';
 
 interface Props {
@@ -7,13 +8,35 @@ interface Props {
   onClose: () => void;
 }
 
+const FOCUSABLE = 'a[href],button:not([disabled]),input,textarea,select,[tabindex]:not([tabindex="-1"])';
+
 export function ProductDetailModal({ product, onClose }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    // Focus first focusable element inside modal
+    const first = dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+    first?.focus();
+
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key !== 'Tab') return;
+      const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    document.addEventListener('keydown', handler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+      prev?.focus();
+    };
   }, [onClose]);
 
   return (
@@ -23,6 +46,7 @@ export function ProductDetailModal({ product, onClose }: Props) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
@@ -40,11 +64,13 @@ export function ProductDetailModal({ product, onClose }: Props) {
         {product.images.length > 0 && (
           <div className="flex gap-2 overflow-x-auto p-4">
             {product.images.map((img, i) => (
-              <img
+              <Image
                 key={i}
                 src={img}
                 alt={`${product.title} ${i + 1}`}
-                className="h-40 w-auto rounded object-cover flex-shrink-0"
+                width={160}
+                height={160}
+                className="rounded object-cover flex-shrink-0"
               />
             ))}
           </div>

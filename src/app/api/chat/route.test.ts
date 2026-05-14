@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { AIMessageChunk, ToolMessage } from '@langchain/core/messages';
 
-const { mockGraph, mockUpdateConversationTitle, MockOpenAI } = vi.hoisted(() => {
+const { mockGraph, mockUpdateConversationTitle, MockChatOpenAI } = vi.hoisted(() => {
   const mockUpdateConversationTitle = vi.fn();
   const mockGraph = {
     stream: vi.fn(async function* () {
@@ -11,18 +11,10 @@ const { mockGraph, mockUpdateConversationTitle, MockOpenAI } = vi.hoisted(() => 
     }),
     getState: vi.fn(async () => ({ values: { messages: [], summary: '' } })),
   };
-  const MockOpenAI = vi.fn().mockImplementation(function () {
-    return {
-      chat: {
-        completions: {
-          create: vi.fn(async () => ({
-            choices: [{ message: { content: 'Wireless headphones search' } }],
-          })),
-        },
-      },
-    };
+  const MockChatOpenAI = vi.fn().mockImplementation(function () {
+    return { invoke: vi.fn(async () => ({ content: 'Wireless headphones search' })) };
   });
-  return { mockGraph, mockUpdateConversationTitle, MockOpenAI };
+  return { mockGraph, mockUpdateConversationTitle, MockChatOpenAI };
 });
 
 vi.mock('@/lib/agent', () => ({ createGraph: vi.fn(() => mockGraph) }));
@@ -30,7 +22,7 @@ vi.mock('@/lib/checkpointer', () => ({ getCheckpointer: vi.fn(() => ({})) }));
 vi.mock('@/lib/conversations', () => ({
   updateConversationTitle: mockUpdateConversationTitle,
 }));
-vi.mock('openai', () => ({ default: MockOpenAI }));
+vi.mock('@langchain/openai', () => ({ ChatOpenAI: MockChatOpenAI }));
 
 import { POST } from './route';
 
@@ -89,6 +81,27 @@ describe('POST /api/chat', () => {
     const titleChunk = chunks.find(c => c.type === 'title_update');
     expect(titleChunk?.title).toBe('Wireless headphones search');
     expect(mockUpdateConversationTitle).toHaveBeenCalledWith('conv-1', 'Wireless headphones search');
+  });
+
+  it('tool_result chunk carries the correct tool name', async () => {
+    const chunks = await collectChunks(await POST(new NextRequest('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ threadId: 'thread-1', message: 'show me phones' }),
+    })));
+    const toolResult = chunks.find(c => c.type === 'tool_result');
+    expect(toolResult?.name).toBe('search_products');
+  });
+
+  it('emits error chunk when graph stream throws', async () => {
+    mockGraph.stream.mockImplementationOnce(async function* () {
+      throw new Error('boom');
+      yield; // make TypeScript happy with async generator
+    });
+    const chunks = await collectChunks(await POST(new NextRequest('http://localhost/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ threadId: 'thread-1', message: 'fail' }),
+    })));
+    expect(chunks.some(c => c.type === 'error')).toBe(true);
   });
 
 });

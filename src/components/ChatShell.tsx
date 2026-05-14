@@ -12,6 +12,7 @@ export function ChatShell() {
   const [preferences, setPreferences] = useState<Record<string, string>>({});
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [preferenceNotice, setPreferenceNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +37,13 @@ export function ChatShell() {
     setActiveConvId(conv.id);
     setActiveThreadId(conv.threadId);
     setMessages([]);
-    const res = await fetch(`/api/conversations/${conv.id}`);
-    setMessages(res.ok ? await res.json() : []);
+    setIsLoadingHistory(true);
+    try {
+      const res = await fetch(`/api/conversations/${conv.id}`);
+      setMessages(res.ok ? await res.json() : []);
+    } finally {
+      setIsLoadingHistory(false);
+    }
   }, []);
 
   const startNewConversation = useCallback(async () => {
@@ -183,13 +189,21 @@ export function ChatShell() {
   };
 
   const handleDeletePreference = async (key: string) => {
-    await fetch(`/api/preferences/${encodeURIComponent(key)}`, { method: 'DELETE' });
-    await loadPreferences();
+    try {
+      await fetch(`/api/preferences/${encodeURIComponent(key)}`, { method: 'DELETE' });
+      await loadPreferences();
+    } catch {
+      setError('Could not delete preference. Please try again.');
+    }
   };
 
   const handleClearPreferences = async () => {
-    await fetch('/api/preferences', { method: 'DELETE' });
-    await loadPreferences();
+    try {
+      await fetch('/api/preferences', { method: 'DELETE' });
+      await loadPreferences();
+    } catch {
+      setError('Could not clear preferences. Please try again.');
+    }
   };
 
   return (
@@ -209,7 +223,11 @@ export function ChatShell() {
           {conversations.find(c => c.id === activeConvId)?.title ?? 'Shopping Copilot'}
         </div>
 
-        {messages.length === 0 && !isStreaming ? (
+        {isLoadingHistory ? (
+          <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
+            Loading…
+          </div>
+        ) : messages.length === 0 && !isStreaming ? (
           <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
             Ask me about products — I'll help you find what you're looking for.
           </div>
