@@ -1,11 +1,16 @@
 import { NextRequest } from 'next/server';
-import { HumanMessage } from '@langchain/core/messages';
+import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage } from '@langchain/core/messages';
 import OpenAI from 'openai';
 import { createGraph } from '@/lib/agent';
 import { getCheckpointer } from '@/lib/checkpointer';
 import { updateConversationTitle } from '@/lib/conversations';
 import { PRODUCT_TOOL_NAMES } from '@/types';
+import type { AgentState } from '@/lib/agent';
 import type { StreamChunk } from '@/types';
+
+function isProductToolName(name: string): boolean {
+  return (PRODUCT_TOOL_NAMES as readonly string[]).includes(name);
+}
 
 async function generateTitle(userMessage: string, aiResponse: string): Promise<string> {
   const client = new OpenAI();
@@ -57,35 +62,32 @@ export async function POST(req: NextRequest) {
       try {
         const input = { messages: [new HumanMessage(message)] };
 
-        const graphStream = await graph.stream(input as any, config);
+        const graphStream = await graph.stream(input, config);
 
         let tokensSent = false;
 
-        for await (const [chunk] of graphStream as unknown as AsyncIterable<[any, any]>) {
+        for await (const [chunk] of graphStream as unknown as AsyncIterable<[AIMessageChunk | ToolMessage]>) {
           if (!chunk) continue;
-          const type = chunk._getType?.();
-          if (type === 'AIMessageChunk' || type === 'ai') {
+
+          if (chunk instanceof AIMessageChunk) {
             if (chunk.content) {
-              send({ type: 'token', content: chunk.content });
+              send({ type: 'token', content: typeof chunk.content === 'string' ? chunk.content : '' });
               tokensSent = true;
             }
             for (const tc of chunk.tool_call_chunks ?? []) {
-              if (tc.name && PRODUCT_TOOL_NAMES.includes(tc.name as any)) {
+              if (tc.name && isProductToolName(tc.name)) {
                 send({ type: 'tool_call', name: tc.name });
               }
             }
           }
 
-          if (type === 'tool') {
+          if (chunk instanceof ToolMessage) {
             try {
-              const parsed = JSON.parse(chunk.content);
+              const parsed = JSON.parse(typeof chunk.content === 'string' ? chunk.content : '{}') as Record<string, unknown>;
               if (chunk.name === 'save_preference' && parsed.saved) {
-                send({ type: 'preference_added', key: parsed.key, value: parsed.value });
-              } else if (
-                PRODUCT_TOOL_NAMES.includes(chunk.name as any) &&
-                parsed.products?.length > 0
-              ) {
-                send({ type: 'tool_result', products: parsed.products });
+                send({ type: 'preference_added', key: parsed.key as string, value: parsed.value as string });
+              } else if (chunk.name && isProductToolName(chunk.name) && Array.isArray(parsed.products) && parsed.products.length > 0) {
+                send({ type: 'tool_result', products: parsed.products as StreamChunk['products'] });
               }
             } catch (err) {
               console.error('[chat] failed to parse tool message content:', err);
@@ -96,9 +98,9 @@ export async function POST(req: NextRequest) {
         // Fallback: if no tokens streamed, pull the final AI message from state
         if (!tokensSent) {
           const state = await graph.getState(config);
-          const msgs: any[] = (state.values as any)?.messages ?? [];
+          const msgs = (state.values as AgentState).messages ?? [];
           const lastMsg = msgs[msgs.length - 1];
-          if (lastMsg?._getType?.() === 'ai' && typeof lastMsg.content === 'string' && lastMsg.content) {
+          if (lastMsg instanceof AIMessage && typeof lastMsg.content === 'string' && lastMsg.content) {
             send({ type: 'token', content: lastMsg.content });
           }
         }
@@ -107,11 +109,11 @@ export async function POST(req: NextRequest) {
         if (isFirstMessage && convId) {
           try {
             const state = await graph.getState(config);
-            const allMsgs: any[] = (state.values as any)?.messages ?? [];
+            const allMsgs = (state.values as AgentState).messages ?? [];
             const lastAI = [...allMsgs].reverse().find(
-              (m: any) => m._getType?.() === 'ai' && typeof m.content === 'string' && m.content
+              (m): m is AIMessage => m instanceof AIMessage && typeof m.content === 'string' && !!m.content
             );
-            const aiResponse = lastAI?.content ?? '';
+            const aiResponse = typeof lastAI?.content === 'string' ? lastAI.content : '';
             const title = await generateTitle(message, aiResponse);
             updateConversationTitle(convId, title);
             send({ type: 'title_update', title });

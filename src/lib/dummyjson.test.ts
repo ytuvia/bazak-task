@@ -13,14 +13,14 @@ const fullProduct = {
 
 describe('stripHeavyFields', () => {
   it('removes dimensions, warrantyInformation, sku, weight', () => {
-    const result = stripHeavyFields(fullProduct as any);
+    const result = stripHeavyFields(fullProduct as Record<string, unknown>);
     expect(result).not.toHaveProperty('dimensions');
     expect(result).not.toHaveProperty('warrantyInformation');
     expect(result).not.toHaveProperty('sku');
     expect(result).not.toHaveProperty('weight');
   });
   it('preserves essential fields', () => {
-    const result = stripHeavyFields(fullProduct as any);
+    const result = stripHeavyFields(fullProduct as Record<string, unknown>);
     expect(result.id).toBe(1);
     expect(result.title).toBe('Test');
     expect(result.price).toBe(100);

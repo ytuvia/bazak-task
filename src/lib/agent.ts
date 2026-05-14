@@ -45,6 +45,8 @@ export const StateAnnotation = Annotation.Root({
   }),
 });
 
+export type AgentState = typeof StateAnnotation.State;
+
 const SYSTEM_PROMPT = `You are a helpful shopping assistant. Help users discover products through conversation.
 
 Tool usage guidelines:
@@ -130,14 +132,8 @@ export function shouldSummarize(
 
 function shouldContinue(state: typeof StateAnnotation.State): string {
   const last = state.messages[state.messages.length - 1];
-  if (last instanceof AIMessage || last instanceof AIMessageChunk) {
-    const toolCalls = (last as any).tool_calls ?? [];
-    const toolCallChunks = (last as any).tool_call_chunks ?? [];
-    const hasTools =
-      toolCalls.length > 0 ||
-      toolCallChunks.some((tc: any) => !!tc.name);
-    if (hasTools) return 'tools';
-  }
+  if (last instanceof AIMessage && (last.tool_calls?.length ?? 0) > 0) return 'tools';
+  if (last instanceof AIMessageChunk && (last.tool_call_chunks ?? []).some(tc => !!tc.name)) return 'tools';
   return shouldSummarize(state);
 }
 

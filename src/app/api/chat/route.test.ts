@@ -1,14 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { AIMessageChunk, ToolMessage } from '@langchain/core/messages';
 
 const { mockGraph, mockUpdateConversationTitle, MockOpenAI } = vi.hoisted(() => {
   const mockUpdateConversationTitle = vi.fn();
   const mockGraph = {
     stream: vi.fn(async function* () {
-      yield [{ _getType: () => 'AIMessageChunk', content: 'Here are some phones', tool_call_chunks: [] }, {}];
-      yield [{ _getType: () => 'tool', name: 'search_products', content: JSON.stringify({ products: [{ id: 1, title: 'iPhone' }], total: 1 }) }, {}];
+      yield [new AIMessageChunk({ content: 'Here are some phones', tool_call_chunks: [] })];
+      yield [new ToolMessage({ content: JSON.stringify({ products: [{ id: 1, title: 'iPhone' }], total: 1 }), tool_call_id: 'call-1', name: 'search_products' })];
     }),
-    getState: vi.fn(async () => ({ tasks: [] })),
+    getState: vi.fn(async () => ({ values: { messages: [], summary: '' } })),
   };
   const MockOpenAI = vi.fn().mockImplementation(function () {
     return {
@@ -33,10 +34,12 @@ vi.mock('openai', () => ({ default: MockOpenAI }));
 
 import { POST } from './route';
 
-async function collectChunks(res: Response): Promise<object[]> {
+import type { StreamChunk } from '@/types';
+
+async function collectChunks(res: Response): Promise<StreamChunk[]> {
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
-  const chunks: object[] = [];
+  const chunks: StreamChunk[] = [];
   let done = false;
   while (!done) {
     const { value, done: d } = await reader.read();
@@ -44,7 +47,7 @@ async function collectChunks(res: Response): Promise<object[]> {
     if (value) {
       const text = decoder.decode(value);
       for (const line of text.split('\n').filter(Boolean)) {
-        chunks.push(JSON.parse(line));
+        chunks.push(JSON.parse(line) as StreamChunk);
       }
     }
   }
@@ -67,8 +70,8 @@ describe('POST /api/chat', () => {
     }));
     expect(res.status).toBe(200);
     const chunks = await collectChunks(res);
-    expect(chunks.some((c: any) => c.type === 'token')).toBe(true);
-    expect(chunks.some((c: any) => c.type === 'tool_result')).toBe(true);
+    expect(chunks.some(c => c.type === 'token')).toBe(true);
+    expect(chunks.some(c => c.type === 'tool_result')).toBe(true);
     expect(chunks[chunks.length - 1]).toEqual({ type: 'done' });
   });
 
@@ -83,7 +86,7 @@ describe('POST /api/chat', () => {
       }),
     }));
     const chunks = await collectChunks(res);
-    const titleChunk = chunks.find((c: any) => c.type === 'title_update') as any;
+    const titleChunk = chunks.find(c => c.type === 'title_update');
     expect(titleChunk?.title).toBe('Wireless headphones search');
     expect(mockUpdateConversationTitle).toHaveBeenCalledWith('conv-1', 'Wireless headphones search');
   });

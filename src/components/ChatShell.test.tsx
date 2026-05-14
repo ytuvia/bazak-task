@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ChatShell } from './ChatShell';
+import type { Conversation } from '@/types';
 
 vi.mock('@/components/ConversationSidebar', () => ({
-  ConversationSidebar: ({ conversations, onNew }: any) => (
+  ConversationSidebar: ({ conversations, onNew }: { conversations: Conversation[]; onNew: () => void; [key: string]: unknown }) => (
     <div data-testid="sidebar">
       <button onClick={onNew} data-testid="new-chat">New chat</button>
-      {conversations.map((c: any) => (
+      {conversations.map((c) => (
         <div key={c.id} data-testid={`conv-title-${c.id}`}>{c.title}</div>
       ))}
     </div>
@@ -33,7 +34,7 @@ function makeStream(chunks: object[]): ReadableStream {
 describe('ChatShell', () => {
   beforeEach(() => {
     let conversationCreated = false;
-    vi.stubGlobal('fetch', vi.fn(async (url: string, opts?: any) => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, opts?: RequestInit) => {
       if (url === '/api/conversations' && (!opts || opts.method === 'GET' || !opts.method)) {
         if (conversationCreated) {
           return { ok: true, json: async () => [{ id: 'conv-1', threadId: 'thread-1', title: 'New conversation', createdAt: new Date().toISOString() }] };

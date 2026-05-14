@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MemorySaver } from '@langchain/langgraph';
-import { HumanMessage, AIMessage, ToolMessage } from '@langchain/core/messages';
+import { HumanMessage, AIMessage, ToolMessage, BaseMessage } from '@langchain/core/messages';
 import { createGraph, shouldSummarize } from '@/lib/agent';
 
 vi.mock('@/lib/store', () => ({
@@ -20,8 +20,8 @@ describe.skipIf(!hasApiKey)('core product discovery flow', () => {
   it('calls search_products for a phone query and produces AIMessage', async () => {
     const graph = createGraph(new MemorySaver());
     const state = await runGraph(graph, 'show me phones under $500');
-    const messages = state.values.messages as any[];
-    const toolMessages = messages.filter((m: any) => m instanceof ToolMessage);
+    const messages = state.values.messages as BaseMessage[];
+    const toolMessages = messages.filter((m): m is ToolMessage => m instanceof ToolMessage);
     expect(toolMessages.length).toBeGreaterThan(0);
     expect(toolMessages[0].name).toBe('search_products');
     const lastMessage = messages[messages.length - 1];
@@ -31,16 +31,16 @@ describe.skipIf(!hasApiKey)('core product discovery flow', () => {
   it('calls list_categories when asked what is available', async () => {
     const graph = createGraph(new MemorySaver());
     const state = await runGraph(graph, 'what categories do you have?');
-    const messages = state.values.messages as any[];
-    const toolMessages = messages.filter((m: any) => m instanceof ToolMessage);
-    expect(toolMessages.some((m: any) => m.name === 'list_categories')).toBe(true);
+    const messages = state.values.messages as BaseMessage[];
+    const toolMessages = messages.filter((m): m is ToolMessage => m instanceof ToolMessage);
+    expect(toolMessages.some(m => m.name === 'list_categories')).toBe(true);
   });
 
   it('calls browse_category for general category interest', async () => {
     const graph = createGraph(new MemorySaver());
     const state = await runGraph(graph, 'show me smartphones');
-    const messages = state.values.messages as any[];
-    const toolMsg = messages.find((m: any) => m instanceof ToolMessage);
+    const messages = state.values.messages as BaseMessage[];
+    const toolMsg = messages.find((m): m is ToolMessage => m instanceof ToolMessage);
     expect(['browse_category', 'search_products']).toContain(toolMsg?.name);
   });
 });
@@ -54,9 +54,9 @@ describe.skipIf(!hasApiKey)('multi-turn context', () => {
     await graph.invoke({ messages: [new HumanMessage('tell me more about the first one')] }, config);
 
     const state = await graph.getState(config);
-    const messages = state.values.messages as any[];
-    const toolCalls = messages.filter((m: any) => m instanceof ToolMessage);
-    expect(toolCalls.some((m: any) => m.name === 'get_product')).toBe(true);
+    const messages = state.values.messages as BaseMessage[];
+    const toolCalls = messages.filter((m): m is ToolMessage => m instanceof ToolMessage);
+    expect(toolCalls.some(m => m.name === 'get_product')).toBe(true);
   });
 });
 
@@ -71,7 +71,7 @@ describe.skipIf(!hasApiKey)('empty results', () => {
     );
     const graph = createGraph(new MemorySaver());
     const state = await runGraph(graph, 'find me a unicorn product');
-    const messages = state.values.messages as any[];
+    const messages = state.values.messages as BaseMessage[];
     const lastMsg = messages[messages.length - 1];
     expect(lastMsg).toBeInstanceOf(AIMessage);
     expect(typeof lastMsg.content).toBe('string');
@@ -91,7 +91,7 @@ describe.skipIf(!hasApiKey)('summarization', () => {
     const state = await graph.getState(config);
     expect(state.values.summary).toBeTruthy();
     // Messages are no longer pruned — full history preserved in checkpoint
-    expect((state.values.messages as any[]).length).toBeGreaterThan(0);
+    expect((state.values.messages as BaseMessage[]).length).toBeGreaterThan(0);
     process.env.SUMMARY_MESSAGE_THRESHOLD = '10';
   });
 });
