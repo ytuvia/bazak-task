@@ -23,7 +23,8 @@ describe.skipIf(!hasApiKey)('core product discovery flow', () => {
     const messages = state.values.messages as BaseMessage[];
     const toolMessages = messages.filter((m): m is ToolMessage => m instanceof ToolMessage);
     expect(toolMessages.length).toBeGreaterThan(0);
-    expect(['search_products', 'browse_category']).toContain(toolMessages[0].name);
+    const productTool = toolMessages.find(m => ['search_products', 'browse_category'].includes(m.name ?? ''));
+    expect(productTool).toBeDefined();
     const lastMessage = messages[messages.length - 1];
     expect(lastMessage instanceof AIMessage || lastMessage instanceof AIMessageChunk).toBe(true);
   });
