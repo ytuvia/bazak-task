@@ -7,33 +7,51 @@ interface Props {
 }
 
 export function ProductCard({ product, onClick }: Props) {
+  const discounted = product.discountPercentage >= 5;
+
   return (
     <article
       tabIndex={0}
       onClick={() => onClick?.(product)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(product); } }}
-      className="cursor-pointer rounded-lg border border-slate-700 bg-slate-800 overflow-hidden hover:border-blue-500 transition-colors"
+      className="cursor-pointer rounded-xl border border-slate-700 bg-slate-800 overflow-hidden hover:border-blue-500 hover:shadow-lg hover:shadow-blue-900/20 transition-all duration-150 flex flex-col"
     >
-      <img
-        src={product.thumbnail}
-        alt={product.title}
-        className="w-full h-32 object-cover"
-      />
-      <div className="p-3">
-        <h3 className="text-sm font-semibold text-slate-100 line-clamp-1">
+      <div className="relative bg-slate-900 flex items-center justify-center" style={{ aspectRatio: '4/3' }}>
+        <img
+          src={product.thumbnail}
+          alt={product.title}
+          className="w-full h-full object-contain p-2"
+        />
+        {discounted && (
+          <span className="absolute top-2 left-2 rounded-md bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+            -{Math.round(product.discountPercentage)}%
+          </span>
+        )}
+      </div>
+
+      <div className="p-3 flex flex-col flex-1">
+        <h3 className="text-xs font-semibold text-slate-100 line-clamp-2 leading-snug">
           {product.title}
         </h3>
-        <p className="text-xs text-slate-400 line-clamp-2 mt-1">
-          {product.description}
-        </p>
-        <div className="mt-2 flex items-center justify-between">
-          <span className="text-sm font-bold text-emerald-400">
-            ${product.price.toFixed(2)}
+
+        <div className="mt-auto pt-2 flex items-end justify-between gap-1">
+          <div className="flex flex-col">
+            <span className="text-sm font-bold text-emerald-400">
+              ${product.price.toFixed(2)}
+            </span>
+            {discounted && (
+              <span className="text-[10px] text-slate-500 line-through">
+                ${(product.price / (1 - product.discountPercentage / 100)).toFixed(2)}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+            ★ {product.rating.toFixed(1)}
           </span>
-          <span className="text-xs text-slate-400">⭐ {product.rating}</span>
         </div>
+
         <span
-          className={`mt-1 inline-block text-xs ${
+          className={`mt-1.5 text-[10px] font-medium ${
             product.availabilityStatus === 'In Stock'
               ? 'text-emerald-400'
               : 'text-amber-400'
