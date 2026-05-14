@@ -11,7 +11,7 @@ export function stripHeavyFields(product: Record<string, unknown>): Product {
   return result as unknown as Product;
 }
 
-const FETCH_TIMEOUT_MS = 8000;
+const FETCH_TIMEOUT_MS = parseInt(process.env.DUMMYJSON_FETCH_TIMEOUT_MS ?? '8000', 10);
 
 export async function fetchDummyJSON(path: string): Promise<ToolResult> {
   const res = await fetch(`${BASE_URL}${path}`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });

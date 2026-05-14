@@ -81,4 +81,5 @@ Vitest with two projects (see `vitest.config.ts`): `node` (lib + API + integrati
 | `SUMMARY_MESSAGE_THRESHOLD` | `10` | Messages before summarization |
 | `AGENT_MESSAGE_WINDOW` | `20` | Recent messages passed to LLM per turn |
 | `TOOL_RESULTS_LIMIT` | `10` | Max products per tool call |
-| `DB_PATH` | `data/bazak.db` | SQLite path (`：memory:` in tests) |
+| `DB_PATH` | `data/bazak.db` | SQLite path (`:memory:` in tests) |
+| `DUMMYJSON_FETCH_TIMEOUT_MS` | `8000` | Timeout for DummyJSON API calls (ms) |

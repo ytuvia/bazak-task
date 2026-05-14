@@ -73,3 +73,4 @@ DummyJSON has no semantic ranking or price filter. The agent fetches up to `TOOL
 | `AGENT_MESSAGE_WINDOW` | `20` | Max recent messages passed to the LLM per turn |
 | `TOOL_RESULTS_LIMIT` | `10` | Max products fetched per tool call |
 | `DB_PATH` | `data/bazak.db` | SQLite file path |
+| `DUMMYJSON_FETCH_TIMEOUT_MS` | `8000` | Timeout for DummyJSON API calls (ms) |
