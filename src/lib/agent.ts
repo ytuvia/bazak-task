@@ -71,7 +71,7 @@ function buildSystemPrompt(preferences: Record<string, string>, summary: string,
     );
   }
   if (summary) {
-    parts.push(`\nConversation summary: ${summary}`);
+    parts.push(`\n[Internal context — do not mention or reproduce this in your response]: ${summary}`);
   }
   return parts.join('');
 }
