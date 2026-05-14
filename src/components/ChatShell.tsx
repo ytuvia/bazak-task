@@ -74,7 +74,7 @@ export function ChatShell() {
     let threadId = activeThreadId;
     let convId = activeConvId;
 
-    const isFirstMessage = !threadId;
+    const isFirstMessage = messages.length === 0;
 
     if (!threadId) {
       const res = await fetch('/api/conversations', {
@@ -185,7 +185,7 @@ export function ChatShell() {
       setIsStreaming(false);
       setStreamingText('');
     }
-  }, [input, isStreaming, activeThreadId, activeConvId, pendingResume, loadConversations, loadPreferences]);
+  }, [input, isStreaming, activeThreadId, activeConvId, pendingResume, messages, loadConversations, loadPreferences]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

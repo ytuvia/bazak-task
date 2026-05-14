@@ -8,19 +8,22 @@ import { updateConversationTitle } from '@/lib/conversations';
 import { PRODUCT_TOOL_NAMES } from '@/types';
 import type { StreamChunk } from '@/types';
 
-async function generateTitle(firstMessage: string): Promise<string> {
+async function generateTitle(userMessage: string, aiResponse: string): Promise<string> {
   const client = new OpenAI();
+  const context = aiResponse
+    ? `User: "${userMessage}"\nAssistant: "${aiResponse.slice(0, 300)}"`
+    : `User: "${userMessage}"`;
   const resp = await client.chat.completions.create({
     model: process.env.SUMMARY_MODEL ?? 'gpt-4o-mini',
     messages: [
       {
         role: 'user',
-        content: `Generate a 4-6 word title for a shopping conversation that started with: "${firstMessage}". Reply with only the title, no punctuation.`,
+        content: `Generate a 4-6 word title for a shopping conversation. Use the context below to capture what the conversation is actually about, not just the opening greeting.\n\n${context}\n\nReply with only the title, no punctuation.`,
       },
     ],
     max_tokens: 20,
   });
-  return resp.choices[0].message.content?.trim() ?? firstMessage.slice(0, 60);
+  return resp.choices[0].message.content?.trim() ?? userMessage.slice(0, 60);
 }
 
 export async function POST(req: NextRequest) {
@@ -116,7 +119,12 @@ export async function POST(req: NextRequest) {
         // Generate and persist title after first assistant response
         if (isFirstMessage && convId && !resume) {
           try {
-            const title = await generateTitle(message);
+            const allMsgs: any[] = (state.values as any)?.messages ?? [];
+            const lastAI = [...allMsgs].reverse().find(
+              (m: any) => m._getType?.() === 'ai' && typeof m.content === 'string' && m.content
+            );
+            const aiResponse = lastAI?.content ?? '';
+            const title = await generateTitle(message, aiResponse);
             updateConversationTitle(convId, title);
             send({ type: 'title_update', title });
           } catch {
