@@ -21,6 +21,17 @@ export function MessageList({ messages, isStreaming, streamingText }: Props) {
       {messages.map(msg => (
         <MessageBubble key={msg.id} message={msg} />
       ))}
+      {isStreaming && !streamingText && (
+        <div className="flex justify-start">
+          <div className="rounded-2xl rounded-bl-sm bg-slate-700 px-4 py-3">
+            <div className="flex gap-1 items-center">
+              <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
       {isStreaming && streamingText && (
         <div className="flex justify-start">
           <div className="max-w-[80%] rounded-2xl rounded-bl-sm bg-slate-700 px-4 py-2 text-sm text-slate-100">
