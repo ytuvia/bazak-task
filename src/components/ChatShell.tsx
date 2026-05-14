@@ -95,7 +95,7 @@ export function ChatShell() {
     }
 
     const userMessage: SerializedMessage = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       role: 'human',
       content: input,
     };
@@ -136,7 +136,7 @@ export function ChatShell() {
 
           if (chunk.type === 'tool_result' && chunk.products) {
             const toolMsg: SerializedMessage = {
-              id: `tool-${Date.now()}`,
+              id: crypto.randomUUID(),
               role: 'tool',
               content: JSON.stringify({ products: chunk.products, total: chunk.products.length }),
               toolName: 'search_products',
@@ -152,7 +152,7 @@ export function ChatShell() {
 
           if (chunk.type === 'interrupt' && chunk.question) {
             const interruptMsg: SerializedMessage = {
-              id: `interrupt-${Date.now()}`,
+              id: crypto.randomUUID(),
               role: 'ai',
               content: chunk.question,
             };
@@ -169,7 +169,7 @@ export function ChatShell() {
           if (chunk.type === 'done') {
             if (accText) {
               const aiMsg: SerializedMessage = {
-                id: `ai-${Date.now()}`,
+                id: crypto.randomUUID(),
                 role: 'ai',
                 content: accText,
               };
