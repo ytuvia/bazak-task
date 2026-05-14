@@ -53,8 +53,8 @@ There is no separate intent classifier. The LLM decides which tool to call — a
 A `save_preference` tool lets the agent persist stable user preferences (budget, brand, category) to a SQLite-backed key-value store. Preferences persist across conversations and are injected into the system prompt on every agent invocation. Users can view and delete preferences via the sidebar panel.
 
 ### Model selection
-- `AGENT_MODEL` (default: `gpt-4o-mini`) — used for the main agent node: intent understanding, tool selection, relevance filtering, response generation.
-- `SUMMARY_MODEL` (default: `gpt-4o-mini`) — used for the summarize node and title generation.
+- `AGENT_MODEL` (default: `gpt-5.4-mini`) — used for the main agent node: intent understanding, tool selection, relevance filtering, response generation.
+- `SUMMARY_MODEL` (default: `gpt-5.4-nano`) — used for the summarize node and title generation.
 
 ### Streaming
 Responses stream token-by-token via HTTP `ReadableStream` (not SSE). The API route pipes LangGraph's async iterator into a `ReadableStream` and encodes each event as a newline-delimited JSON line with a `type` discriminator: `token`, `tool_call`, `tool_result`, `preference_added`, `title_update`, `done`, `error`. Only tokens from the `agent` node are forwarded — the `summarize` node's LLM output is filtered out so it never appears in the chat.
