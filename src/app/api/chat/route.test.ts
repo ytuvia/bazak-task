@@ -6,8 +6,8 @@ const { mockGraph, mockUpdateConversationTitle, MockOpenAI } = vi.hoisted(() => 
   const mockUpdateConversationTitle = vi.fn();
   const mockGraph = {
     stream: vi.fn(async function* () {
-      yield [new AIMessageChunk({ content: 'Here are some phones', tool_call_chunks: [] })];
-      yield [new ToolMessage({ content: JSON.stringify({ products: [{ id: 1, title: 'iPhone' }], total: 1 }), tool_call_id: 'call-1', name: 'search_products' })];
+      yield [new AIMessageChunk({ content: 'Here are some phones', tool_call_chunks: [] }), { langgraph_node: 'agent' }];
+      yield [new ToolMessage({ content: JSON.stringify({ products: [{ id: 1, title: 'iPhone' }], total: 1 }), tool_call_id: 'call-1', name: 'search_products' }), { langgraph_node: 'tools' }];
     }),
     getState: vi.fn(async () => ({ values: { messages: [], summary: '' } })),
   };

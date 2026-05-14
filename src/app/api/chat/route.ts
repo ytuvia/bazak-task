@@ -66,10 +66,11 @@ export async function POST(req: NextRequest) {
 
         let tokensSent = false;
 
-        for await (const [chunk] of graphStream as unknown as AsyncIterable<[AIMessageChunk | ToolMessage]>) {
+        for await (const [chunk, meta] of graphStream as unknown as AsyncIterable<[AIMessageChunk | ToolMessage, Record<string, string>]>) {
           if (!chunk) continue;
+          const node = meta?.langgraph_node;
 
-          if (chunk instanceof AIMessageChunk) {
+          if (chunk instanceof AIMessageChunk && node === 'agent') {
             if (chunk.content) {
               send({ type: 'token', content: typeof chunk.content === 'string' ? chunk.content : '' });
               tokensSent = true;
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          if (chunk instanceof ToolMessage) {
+          if (chunk instanceof ToolMessage && node === 'tools') {
             try {
               const parsed = JSON.parse(typeof chunk.content === 'string' ? chunk.content : '{}') as Record<string, unknown>;
               if (chunk.name === 'save_preference' && parsed.saved) {
