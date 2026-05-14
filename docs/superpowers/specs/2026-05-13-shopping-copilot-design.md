@@ -143,9 +143,9 @@ const StateAnnotation = Annotation.Root({
 **`summarize` node**
 - Called only when message count exceeds `SUMMARY_MESSAGE_THRESHOLD` (default: 10)
 - Calls `SUMMARY_MODEL` (default: `gpt-5.4-nano`) to summarize the conversation so far
-- Stores result in `state.summary`
-- Trims `state.messages` to the last 4 messages
+- Stores result in `state.summary` — messages are NOT pruned, preserving full history in the checkpoint
 - The summary is injected into every subsequent agent call via `SystemMessage`
+- The agent node passes only the last `AGENT_MESSAGE_WINDOW` (default: 20) messages to the LLM to keep context affordable
 
 ### Graph edges
 
@@ -494,7 +494,7 @@ When the user's request is too vague to retrieve meaningful products ("show me s
 
 ## Tradeoffs & Limitations
 
-- **Summary is lossy.** Once messages are summarized and trimmed, the exact wording of earlier turns is gone. For a shopping assistant this is acceptable — product IDs from tool results are still in the retained messages.
+- **Checkpoint grows unbounded.** Messages are never pruned from state, so long conversations accumulate in the SQLite checkpoint. For a local single-user app this is acceptable; a multi-user deployment would need a retention policy.
 - **DummyJSON has no price filter.** Price constraints are handled by the LLM post-retrieval, not at the API level. If the catalog were larger, this would be a meaningful limitation.
 - **No authentication.** The app is local-only; all conversations belong to a single user. The Store uses a fixed namespace — no user isolation needed.
 - **Store preferences are LLM-inferred.** The agent writes preferences based on what it interprets from conversation context. Inferences can be wrong; there is no explicit user preference UI to correct them.

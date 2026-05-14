@@ -90,7 +90,8 @@ describe.skipIf(!hasApiKey)('summarization', () => {
 
     const state = await graph.getState(config);
     expect(state.values.summary).toBeTruthy();
-    expect((state.values.messages as any[]).length).toBeLessThanOrEqual(4);
+    // Messages are no longer pruned — full history preserved in checkpoint
+    expect((state.values.messages as any[]).length).toBeGreaterThan(0);
     process.env.SUMMARY_MESSAGE_THRESHOLD = '10';
   });
 });

@@ -13,7 +13,6 @@ import {
   AIMessage,
   AIMessageChunk,
   SystemMessage,
-  RemoveMessage,
 } from '@langchain/core/messages';
 import { ALL_TOOLS } from './tools';
 import { getPreferences } from './store';
@@ -89,7 +88,9 @@ async function agentNode(
     streaming: true,
   }).bindTools(ALL_TOOLS);
 
-  const messages = [new SystemMessage(systemPrompt), ...state.messages];
+  const window = parseInt(process.env.AGENT_MESSAGE_WINDOW ?? '20', 10);
+  const windowed = state.messages.slice(-window);
+  const messages = [new SystemMessage(systemPrompt), ...windowed];
   const response = await model.invoke(messages);
 
   return { messages: [response] };
@@ -114,13 +115,7 @@ async function summarizeNode(
 
   const summary = typeof res.content === 'string' ? res.content : '';
 
-  // Keep last 4 messages, remove the rest
-  const toRemove = state.messages
-    .slice(0, -4)
-    .filter(m => m.id != null)
-    .map(m => new RemoveMessage({ id: m.id! }));
-
-  return { summary, messages: toRemove };
+  return { summary };
 }
 
 export function shouldSummarize(
