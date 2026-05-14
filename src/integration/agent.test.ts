@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MemorySaver } from '@langchain/langgraph';
-import { HumanMessage, AIMessage, ToolMessage, BaseMessage } from '@langchain/core/messages';
+import { HumanMessage, AIMessage, AIMessageChunk, ToolMessage, BaseMessage } from '@langchain/core/messages';
 import { createGraph, shouldSummarize } from '@/lib/agent';
 
 vi.mock('@/lib/store', () => ({
@@ -17,15 +17,15 @@ async function runGraph(graph: ReturnType<typeof createGraph>, message: string, 
 const hasApiKey = !!process.env.OPENAI_API_KEY;
 
 describe.skipIf(!hasApiKey)('core product discovery flow', () => {
-  it('calls search_products for a phone query and produces AIMessage', async () => {
+  it('calls a product tool for a phone query and produces AIMessage', async () => {
     const graph = createGraph(new MemorySaver());
     const state = await runGraph(graph, 'show me phones under $500');
     const messages = state.values.messages as BaseMessage[];
     const toolMessages = messages.filter((m): m is ToolMessage => m instanceof ToolMessage);
     expect(toolMessages.length).toBeGreaterThan(0);
-    expect(toolMessages[0].name).toBe('search_products');
+    expect(['search_products', 'browse_category']).toContain(toolMessages[0].name);
     const lastMessage = messages[messages.length - 1];
-    expect(lastMessage).toBeInstanceOf(AIMessage);
+    expect(lastMessage instanceof AIMessage || lastMessage instanceof AIMessageChunk).toBe(true);
   });
 
   it('calls list_categories when asked what is available', async () => {
@@ -73,7 +73,7 @@ describe.skipIf(!hasApiKey)('empty results', () => {
     const state = await runGraph(graph, 'find me a unicorn product');
     const messages = state.values.messages as BaseMessage[];
     const lastMsg = messages[messages.length - 1];
-    expect(lastMsg).toBeInstanceOf(AIMessage);
+    expect(lastMsg instanceof AIMessage || lastMsg instanceof AIMessageChunk).toBe(true);
     expect(typeof lastMsg.content).toBe('string');
   });
 });

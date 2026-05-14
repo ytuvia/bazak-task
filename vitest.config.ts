@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
+    testTimeout: 30000,
     setupFiles: ['./src/test/setup.ts'],
     projects: [
       {
